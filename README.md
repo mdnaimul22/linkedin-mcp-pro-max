@@ -1,9 +1,9 @@
 <p align="center">
-  <h1 align="center">🌐 LinkedIn MCP Pro Max</h1>
+  <h1 align="center">LinkedIn MCP Pro Max</h1>
 </p>
 
 <p align="center">
-  A high-performance, autonomous <strong>Model Context Protocol (MCP)</strong> server that turns LinkedIn into an API for your AI workflows. Built with <strong>Clean Architecture</strong>, stealth browser automation, and robust self-healing APIs.
+  A high-performance, autonomous <strong>Model Context Protocol (MCP)</strong> server that turns LinkedIn into an API for your AI workflows. Built with <strong>Clean Architecture</strong>, stealth browser automation, and a convention-based zero-config component registry.
 </p>
 
 <p align="center">
@@ -23,52 +23,59 @@
 
 ---
 
-## 🚀 Overview
+## Overview
 
-The browser as we know it is evolving from a viewing window to an **Automated Representative**. **LinkedIn MCP Pro Max** is a Next-Gen User Agent. It acts on your behalf using your authorized session, directly passing control to LLMs via the Model Context Protocol.
+The browser is evolving from a viewing window to an **Automated Representative**. **LinkedIn MCP Pro Max** is a Next-Gen User Agent. It acts on your behalf using your authorized session, directly passing control to LLMs via the Model Context Protocol.
 
-✅ **Autonomous Authentication** using headless GUI injection.  
-✅ **Stealth Browsing** via Patchright (bypassing normal bot detection).  
-✅ **Clean Architecture** ensuring uncoupled UI scaling and 100% deterministic tooling.  
-✅ **Self-Healing Endpoints** capable of automatically mapping internal LinkedIn APIs when visual UI shifts.
+- **Autonomous Authentication** using headless GUI injection.
+- **Stealth Browsing** via Patchright (bypasses advanced bot detection).
+- **Dynamic Tool Discovery** — Zero-config tool registration via `pkgutil`.
+- **Unified Component Registry** — Services, actors, and scrapers auto-register at startup. `app.py` and `manager.py` never need editing.
+- **Self-Healing Endpoints** — Automatically maps internal LinkedIn APIs when visual UI shifts.
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### 1. Prerequisites
-Ensure you have **[uv](https://docs.astral.sh/uv/)** installed, the extremely fast Python package and project manager written in Rust.
 
-### 2. Installation Setup
+Ensure you have **[uv](https://docs.astral.sh/uv/)** installed:
 ```bash
-# Clone the repository
-git clone <repository_url> linkedin-mcp-pro-max
-cd linkedin-mcp-pro-max
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-# Sync dependencies and install the stealth browser
+### 2. Installation & Setup
+
+#### Method A: Automated Setup (Recommended)
+```bash
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+The script handles dependency syncing, `.env` bootstrapping, and stealth browser provisioning.
+
+#### Method B: Manual Setup
+```bash
 uv sync
-uv run patchright install chromium
+uv run python -m patchright install chromium
+cp .env.example .env
 ```
 
 ### 3. Configuration
-Copy the configuration template and fill in your details:
-```bash
-cp .env.example .env
-```
-Ensure `.env` contains your details:
+
+Edit `.env` with your LinkedIn credentials:
 ```env
 LINKEDIN_USERNAME="your-email@example.com"
 LINKEDIN_PASSWORD="your-secure-password"
 ```
 
-### 4. Initialization (First Run)
-Authenticate your session automatically securely (stores cookies locally):
+### 4. First-Run Authentication
 ```bash
 uv run linkedin-mcp-pro-max --login-auto
 ```
 
-### 5. Connecting with Claude Desktop (or any MCP Client)
-Add the server to your `claude_desktop_config.json`:
+### 5. Connect to Claude Desktop (or any MCP client)
+
+Add to your `claude_desktop_config.json`:
 ```json
 "mcpServers": {
   "linkedin-mcp-pro-max": {
@@ -78,128 +85,155 @@ Add the server to your `claude_desktop_config.json`:
       "/absolute/path/to/linkedin-mcp-pro-max",
       "run",
       "linkedin-mcp-pro-max"
-    ],
-    "env": {}
+    ]
   }
 }
 ```
 
 ---
 
-## 🧰 The MCP Toolkit (24 Tools)
-
-**LinkedIn MCP Pro Max** exposes 24 specialized intelligent tools broken down by functional category.
+## The MCP Toolkit (24 Tools)
 
 | Category | Tool | Description |
 | :--- | :--- | :--- |
 | **Profile** | `get_profile` | Scrape deep profile data (experience, education, skills) |
 | | `analyze_profile` | AI-driven optimization feedback on profile metrics |
-| | `update_profile` | Update your specific headline and summary instantly |
+| | `update_profile` | Update your headline and summary instantly |
 | | `add_experience` | Add a new professional experience securely |
 | | `edit_experience` | Edit an existing experience entry |
 | | `remove_experience` | Securely remove an unwanted experience entry |
 | | `manage_skills` | Add or delete skills from your profile |
 | **Intel & Jobs** | `search_jobs` | Search open positions with granular filtering |
-| | `get_job_details` | Scrap the full internal details of a specific job ID |
-| | `get_recommended_jobs` | Fetch personalized recommendations tailored to your profile |
-| | `get_company` | Extract detailed corporate metadata and structure |
+| | `get_job_details` | Get the full details of a specific job ID |
+| | `get_recommended_jobs` | Fetch personalized job recommendations |
+| | `get_company` | Extract detailed corporate metadata |
 | **Content** | `create_linkedin_post` | Publish professional AI-generated posts autonomously |
 | | `interact_with_post` | Read, Like, or Comment on feed posts via URL |
 | **Documents** | `generate_resume` | AI-generate a professional resume dynamically |
-| | `tailor_resume` | Target your resume to perfectly match a specific Job ID |
-| | `generate_cover_letter` | Create a highly-personalized contextualized cover letter |
-| | `list_templates` | View styling templates natively supported by the system |
-| **CRM** | `track_application` | Log an application directly to the internal tracking schema |
-| | `list_applications` | Yield the list of all active local job tracks |
-| | `update_application_status` | Update statuses (`interested`, `interviewing`, `rejected`) |
-| **API Self-Healing** | `get_network_logs` | Discover hidden backend API logic directly via proxy |
-| | `execute_linkedin_api` | Call raw LinkedIn internal voyager API endpoints directly |
-| | `save_api_pattern` | Persist an endpoint signature uniquely to bypass DOM failures |
-| | `list_api_patterns` | List community and internally saved API signature models |
+| | `tailor_resume` | Target your resume to match a specific Job ID |
+| | `generate_cover_letter` | Create a personalized contextualized cover letter |
+| | `list_templates` | View all available styling templates |
+| **CRM** | `track_application` | Log an application to the internal tracking schema |
+| | `list_applications` | List all active tracked job applications |
+| | `update_application_status` | Update status (interested/interviewing/rejected) |
+| **API Self-Healing** | `get_network_logs` | Discover hidden backend API patterns via proxy |
+| | `execute_linkedin_api` | Call raw LinkedIn internal voyager API endpoints |
+| | `save_api_pattern` | Persist a working endpoint signature to the cookbook |
+| | `list_api_patterns` | List all saved API signature models |
 
 ---
 
-## 🏗️ Architecture & Adding New Tools
+## Architecture
 
-Built strictly on **Clean Architecture**, enforcing Unidirectional Dependency rules to ensure the codebase remains maintainable, decoupled, and highly modular.
+Built on **Clean Architecture** with a one-way dependency rule and a **Unified Component Registry** that eliminates all manual wiring.
 
-### Structure At a Glance
-- `schema/` • Pydantic Domain Entities (No dependencies).
-- `services/` • Business use-cases, orchestration, and logic.
-- `browser/` & `api/` • Infrastructure adapters and external handlers.
-- `tools/` • Interface Adapters handling strict MCP inputs/outputs.
-- `app.py` • Dependency Injection Container (`AppContext`).
+```
+[tools/]  →  [services/]  →  [browser/actors/ + browser/scrapers/]
+              ctx.my_svc        manager.my_actor / manager.my_scraper
+```
+
+### Directory Structure
+
+```
+src/
+├── app.py                  # Composition root — auto-wires from registry
+├── helpers/
+│   └── registry.py         # Unified discovery engine (ServiceMeta, ActorMeta, ScraperMeta)
+├── tools/                  # MCP tool definitions (@mcp.tool) — auto-discovered
+├── services/               # Business logic layer — auto-wired via SERVICE markers
+├── browser/
+│   ├── actors/             # Write operations (UI interaction) — auto-registered
+│   ├── scrapers/           # Read operations (data extraction) — auto-registered
+│   ├── manager.py          # Orchestrator — auto-instantiates actors/scrapers
+│   └── helpers/            # Low-level browser utilities (driver, sniffer, dom)
+├── api/                    # LinkedIn internal API client
+├── db/                     # Database repositories
+├── schema/                 # Pydantic domain models
+├── config/                 # Settings and environment
+└── providers/              # AI provider wrappers (OpenAI, Claude)
+```
+
+### The Zero-Config Flow
+
+At startup, `helpers/registry.py` scans `services/`, `browser/actors/`, and `browser/scrapers/` automatically:
+
+```
+discover_all()
+├── services/*.py     → SERVICE = ServiceMeta(...)   → injected into AppContext
+├── browser/actors/*  → ACTOR   = ActorMeta(...)     → instantiated in BrowserManager
+└── browser/scrapers/ → SCRAPER = ScraperMeta(...)   → instantiated in BrowserManager
+```
+
+No manual registration. No editing `app.py` or `manager.py`.
 
 ---
 
-### 🔧 Adding A New Tool Properly
+## Adding New Features
 
-**Rule #1: Tools contain NO business logic.**  
-Instead of putting logic in the tool, delegate it to the `Service Layer`.
+> For the complete development pipeline, debugging guide, and working examples, see the **[Tool Development Guide](docs/develop_new_tool.md)**.
 
-#### 1. Define the Business Logic (`src/services/network.py`)
+A full feature (scraper + service + tool) requires exactly **3 new files**. No existing file is modified.
+
+**1. Browser Scraper** — `src/browser/scrapers/my_feature.py`
 ```python
-from typing import Any
-from helpers.exceptions import LinkedInMCPError
+from helpers.registry import ScraperMeta
 
-class NetworkService:
-    def __init__(self, browser_manager):
-        self._browser = browser_manager
+class MyFeatureScraper:
+    def __init__(self, page): ...
+    async def scrape(self): ...
 
-    async def connect(self, profile_url: str) -> Any:
-        if not self._browser:
-            raise LinkedInMCPError("Browser unavailable.")
-        # Scraping logic goes here!
-        return {"status": "connected", "url": profile_url}
+SCRAPER = ScraperMeta(attr="my_feature_scraper", cls=MyFeatureScraper)
 ```
 
-#### 2. Register Service in DI Container (`src/app.py`)
-We map the service inside our core context container.
+**2. Service** — `src/services/my_feature.py`
 ```python
-from services.network import NetworkService
+from helpers.registry import ServiceMeta
 
-class AppContext:
-    def __init__(self, ...):
-        self.network = NetworkService(self.browser)
+class MyFeatureService:
+    def __init__(self, browser=None): ...
+    async def do_work(self): ...
+
+SERVICE = ServiceMeta(attr="my_feature", cls=MyFeatureService, deps=["browser"], lazy=True)
 ```
 
-#### 3. Create the Thin Interface Tool (`src/tools/network.py`)
-Validate the input, initialize the environment, and hand off to the service.
+**3. Tool** — `src/tools/my_feature.py`
 ```python
-import json
-from fastmcp.exceptions import ToolError
 from app import mcp, get_ctx
 
 @mcp.tool()
-async def connect_user(profile_url: str) -> str:
-    """Connect securely to a user on LinkedIn."""
-    try:
-        ctx = await get_ctx()
-        await ctx.initialize_browser() # Initialize environment mapping
-        result = await ctx.network.connect(profile_url) # Hit the service layer
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        raise ToolError(str(e))
+async def my_feature_tool(param: str) -> str:
+    """Description the AI reads to decide when to use this tool."""
+    ctx = await get_ctx()
+    await ctx.initialize_browser()
+    result = await ctx.my_feature.do_work()
+    return json.dumps(result)
 ```
 
-#### 4. Expose the Tool (`src/tools/__init__.py`)
-Ensure your new file is loaded natively by the application during startup.
-```python
-from . import network
+`app.py`, `manager.py`, `services/__init__.py`, `tools/__init__.py` — never touched.
+
+---
+
+## CLI Reference
+
+```bash
+uv run linkedin-mcp-pro-max             # Start MCP server
+uv run linkedin-mcp-pro-max --login-auto # Automated headless login
+uv run linkedin-mcp-pro-max --login      # Interactive browser login
+uv run linkedin-mcp-pro-max --status     # Check session status
+uv run linkedin-mcp-pro-max --logout     # Clear local session cache
+uv run ty check                          # Type-check the project
 ```
 
 ---
 
-## 🛠️ CLI Reference
+## Documentation
 
-Additional utilities to manage the background daemon smoothly:
-
-```bash
-uv run linkedin-mcp-pro-max           # Start server
-uv run linkedin-mcp-pro-max --status  # Check active stealth sessions
-uv run linkedin-mcp-pro-max --logout  # Clear persistent local cache
-uv run ty check                   # Type check whole project
-```
+| Document | Description |
+| :--- | :--- |
+| [Tool Development Guide](docs/develop_new_tool.md) | Full pipeline: creating tools, services, actors, scrapers. Debugging guide. |
+| [Services README](src/services/README.md) | Service layer conventions and dependency rules |
+| [Actors README](src/browser/actors/README.md) | Actor conventions and browser interaction patterns |
+| [Schema README](src/schema/README.md) | Pydantic model conventions |
 
 ---
 

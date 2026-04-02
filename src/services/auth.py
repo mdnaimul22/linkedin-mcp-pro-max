@@ -1,0 +1,151 @@
+"""LinkedIn authentication resolver and interactive login flow.
+
+Dependency Rule:
+  imports FROM: browser, session, exceptions
+  MUST NOT import: api, providers, tools
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+
+from browser import (
+    BrowserManager,
+    validate_linkedin_auth,
+    handle_login_form,
+    stabilize_navigation,
+)
+from browser.session import SessionManager
+
+logger = logging.getLogger("linkedin-mcp.services.auth")
+
+
+class AuthResolver:
+    """Resolver for LinkedIn authentication barriers and login orchestration."""
+
+    def __init__(
+        self, browser: BrowserManager, session_manager: SessionManager
+    ) -> None:
+        self.browser = browser
+        self.sessions = session_manager
+
+    async def is_authenticated(self) -> bool:
+        """Check if the current session is authenticated with LinkedIn."""
+        return await validate_linkedin_auth(self.browser.page)
+
+    async def login_automated(self, timeout: int = 120) -> bool:
+        """Perform an autonomous headless login using stored credentials."""
+        logger.info("Attempting autonomous headless login...")
+        await self.browser.start()
+        page = self.browser.page
+
+        username = self.sessions.settings.linkedin_username
+        password_secret = self.sessions.settings.linkedin_password
+        if not username or not password_secret:
+            logger.error("LinkedIn credentials missing in settings")
+            return False
+        password = password_secret.get_secret_value()
+
+        try:
+            await page.goto(
+                "https://www.linkedin.com/login",
+                wait_until="domcontentloaded",
+                timeout=60000,
+            )
+            await stabilize_navigation(page, timeout=5000)
+
+            success = await handle_login_form(page, username, password)
+            if not success:
+                return False
+
+            logger.info("Login form submitted. Waiting for redirect...")
+
+            loop = asyncio.get_running_loop()
+            start_time = loop.time()
+            while loop.time() - start_time < timeout:
+                url = page.url
+                logger.debug("Current URL: %s", url)
+
+                if "linkedin.com/feed" in url:
+                    logger.info("Successfully reached LinkedIn feed.")
+                    self.sessions.write_source_state()
+                    await self.browser.export_cookies()
+                    return True
+
+                if "checkpoint" in url:
+                    logger.warning("Security checkpoint detected: %s", url)
+                    cp_path = self.sessions.auth_root / "login-checkpoint.png"
+                    await page.screenshot(path=str(cp_path))
+                    logger.info("Checkpoint screenshot saved to %s", cp_path)
+
+                await asyncio.sleep(2)
+
+            logger.error("Automated login timed out or failed to reach feed.")
+            try:
+                debug_path = self.sessions.auth_root / "login-failure.png"
+                await page.screenshot(path=str(debug_path))
+                logger.info("Debug screenshot saved to %s", debug_path)
+            except Exception as exc:
+                logger.error("Failed to save debug screenshot: %s", exc)
+
+            return False
+
+        except Exception as exc:
+            logger.error("Automated login failed: %s", exc)
+            try:
+                err_path = self.sessions.auth_root / "login-error.png"
+                await page.screenshot(path=str(err_path))
+                logger.info("Error screenshot saved to %s", err_path)
+            except Exception:
+                pass
+            return False
+
+    async def login_interactively(self, timeout: int = 300) -> bool:
+        """Perform an interactive login via a visible browser window."""
+        print("\n" + "=" * 60)
+        print("LINKEDIN INTERACTIVE LOGIN")
+        print("=" * 60)
+        print("1. A browser window will open.")
+        print("2. Enter your LinkedIn credentials manually.")
+        print("3. Complete any two-factor authentication (2FA).")
+        print("4. Once you reach the LinkedIn Feed, the session will be saved.")
+        print("=" * 60 + "\n")
+
+        self.browser.driver.headless = False
+        await self.browser.start()
+        page = self.browser.page
+
+        try:
+            await page.goto("https://www.linkedin.com/login")
+            print("Waiting for login completion...")
+
+            loop = asyncio.get_running_loop()
+            start_time = loop.time()
+            while loop.time() - start_time < timeout:
+                if "linkedin.com/feed" in page.url:
+                    if await page.locator(".global-nav").count() > 0:
+                        print("\nLogin successful!")
+                        self.sessions.write_source_state()
+                        await self.browser.export_cookies()
+                        print(f"Session saved to {self.sessions.source_profile_dir}")
+                        return True
+                await asyncio.sleep(2)
+
+            print("\nLogin timed out.")
+            return False
+
+        except Exception as exc:
+            logger.error("Interactive login failed: %s", exc)
+            return False
+
+    async def logout(self) -> bool:
+        """Clear all stored LinkedIn profile and session artifacts."""
+        try:
+            success = self.sessions.logout()
+            if success:
+                logger.info("Logged out successfully. All profiles cleared.")
+            return success
+        except Exception as exc:
+            logger.error("Failed to clear auth artifacts: %s", exc)
+            return False

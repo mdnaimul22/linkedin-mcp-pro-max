@@ -1,0 +1,83 @@
+[project]
+name = "linkedin-mcp-pro-max"
+version = "1.0.0"
+description = "MCP server for LinkedIn profile, company, and job scraping with AI integration. Supports direct profile/company/job URL scraping with secure credential storage."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+authors = [
+    { name = "Naimul", email = "engineer.naimul@gmail.com" }
+]
+license = "Apache-2.0"
+keywords = [
+    "linkedin",
+    "linkedin-automation",
+    "model-context-protocol",
+    "linkedin-scraper",
+    "linkedin-mcp-pro-max",
+    "automation",
+    "llm",
+    "anthropic",
+    "claude",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastmcp>=3.0.0",
+    "patchright>=1.40.0",
+    "python-dotenv>=1.1.1",
+    "pydantic>=2.9.0",
+    "linkedin-api==2.3.0",
+    "anthropic>=0.45.0",
+    "openai>=1.0.0",
+    "weasyprint>=63.0",
+    "jinja2>=3.1.5",
+    "markdown>=3.7",
+    "pydantic-settings>=2.13.1",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "passlib[bcrypt]>=1.7.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/mdnaimul22/linkedin-mcp-pro-max"
+Documentation = "https://github.com/mdnaimul22/linkedin-mcp-pro-max#readme"
+Repository = "https://github.com/mdnaimul22/linkedin-mcp-pro-max"
+Issues = "https://github.com/mdnaimul22/linkedin-mcp-pro-max/issues"
+Changelog = "https://github.com/mdnaimul22/linkedin-mcp-pro-max/releases"
+
+[project.scripts]
+linkedin-mcp-pro-max = "cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["assets*", "docs*", "tests*"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed", "**/*.j2"]
+
+[dependency-groups]
+dev = [
+    "aiohttp>=3.12.13",
+    "aiosqlite>=0.22.1",
+    "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.1.1",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.11.11",
+    "ty>=0.0.1a12",
+]

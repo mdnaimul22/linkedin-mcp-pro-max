@@ -1,0 +1,4 @@
+from .scam_report import ScamReportRepository as ScamReportRepository
+from .scam_pattern import ScamPatternRepository as ScamPatternRepository
+from .audit_log import AuditLogRepository as AuditLogRepository
+from .data_request import DataRequestRepository as DataRequestRepository
