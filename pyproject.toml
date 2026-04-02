@@ -14,10 +14,10 @@ keywords = [
     "model-context-protocol",
     "linkedin-scraper",
     "linkedin-mcp-pro-max",
-    "automation",
-    "llm",
-    "anthropic",
-    "claude",
+    "mcp-server",
+    "model-context-protocol",
+    "linkedin-mcp",
+    "browser-automation",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
