@@ -3,10 +3,14 @@ LinkedIn MCP Pro Max - CLI Entry Point
 This script handles configuration, authentication commands, and starts the server.
 """
 
+import os
 import logging
 import argparse
 import sys
 import asyncio
+import threading
+from pathlib import Path
+
 from app import mcp, run_session_commands
 from config.settings import get_settings, set_settings
 
@@ -59,6 +63,9 @@ Examples:
     # Browser & Environment Overrides
     browser_group = parser.add_argument_group("Browser & Environment Overrides")
     browser_group.add_argument(
+        "--dev", action="store_true", help="Start server in development mode (auto-reload on code changes)"
+    )
+    browser_group.add_argument(
         "--headless", action="store_true", default=None, help="Force headless execution"
     )
     browser_group.add_argument(
@@ -104,6 +111,23 @@ Examples:
 
     # Start the MCP Server
     logger.info("Initializing LinkedIn MCP Pro Max Server...")
+    
+    if hasattr(args, "dev") and args.dev:
+        try:
+            from watchfiles import watch
+            
+            def run_watcher(src_dir: str):
+                watcher_logger = logging.getLogger("linkedin-mcp.watcher")
+                watcher_logger.info(f"Auto-reload enabled: Watching {src_dir} for changes...")
+                for changes in watch(src_dir):
+                    watcher_logger.info(f"Detected changes: {changes}. Restarting server...")
+                    os._exit(0)
+                    
+            src_path = str(Path(__file__).parent.absolute())
+            threading.Thread(target=run_watcher, args=(src_path,), daemon=True).start()
+        except ImportError:
+            logger.error("watchfiles is not installed. Run 'uv pip install watchfiles'")
+            
     mcp.run()
 
 
