@@ -11,9 +11,8 @@ async def profile_resource(profile_id: str) -> str:
     """Retrieve a cached LinkedIn profile."""
     try:
         ctx = await get_ctx()
-        tenant = await ctx.tenants.get_or_create_default_tenant()
         profile_id = await ctx.profiles.resolve_profile_id(profile_id)
-        profile = await ctx.profiles.get_profile(tenant.id, profile_id)
+        profile = await ctx.profiles.get_profile(profile_id)
         return json.dumps(profile.model_dump(), indent=2, default=str)
     except Exception as e:
         logger.error(f"Failed to load profile resource: {e}")

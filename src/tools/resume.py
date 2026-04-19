@@ -33,9 +33,8 @@ async def generate_resume(
     try:
         ctx = await get_ctx()
         profile_id = await ctx.profiles.resolve_profile_id(profile_id)
-        tenant = await ctx.tenants.get_or_create_default_tenant()
         doc = await ctx.resume_gen.generate_resume(
-            tenant.id, profile_id, template, output_format
+            profile_id, template, output_format
         )
         if output_format == "pdf":
             return json.dumps(
@@ -62,9 +61,8 @@ async def tailor_resume(
     try:
         ctx = await get_ctx()
         profile_id = await ctx.profiles.resolve_profile_id(profile_id)
-        tenant = await ctx.tenants.get_or_create_default_tenant()
         doc = await ctx.resume_gen.tailor_resume(
-            tenant.id, profile_id, job_id, template, output_format
+            profile_id, job_id, template, output_format
         )
         if output_format == "pdf":
             return json.dumps(
@@ -94,9 +92,8 @@ async def generate_cover_letter(
     try:
         ctx = await get_ctx()
         profile_id = await ctx.profiles.resolve_profile_id(profile_id)
-        tenant = await ctx.tenants.get_or_create_default_tenant()
         doc = await ctx.cover_letter_gen.generate_cover_letter(
-            tenant.id, profile_id, job_id, template, output_format
+            profile_id, job_id, template, output_format
         )
         if output_format == "pdf":
             return json.dumps(

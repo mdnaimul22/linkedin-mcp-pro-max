@@ -17,13 +17,9 @@ async def get_profile(profile_id: str) -> str:
     """
     try:
         ctx = await get_ctx()
+        await ctx.initialize_browser()
         profile_id = await ctx.profiles.resolve_profile_id(profile_id)
-
-        # Resolve tenant context
-        tenant = await ctx.tenants.get_or_create_default_tenant()
-
-        # Use hybrid strategy for maximum data fidelity (recovers missing skills/exp from browser)
-        profile = await ctx.profiles.get_profile(tenant.id, profile_id)
+        profile = await ctx.profiles.get_profile(profile_id)
         return json.dumps(profile.model_dump(), indent=2, default=str)
     except LinkedInMCPError as e:
         raise ToolError(str(e)) from e
@@ -38,11 +34,8 @@ async def get_company(company_id: str) -> str:
     """
     try:
         ctx = await get_ctx()
-
-        # Resolve tenant context
-        tenant = await ctx.tenants.get_or_create_default_tenant()
-
-        company = await ctx.profiles.get_company(tenant.id, company_id)
+        await ctx.initialize_browser()
+        company = await ctx.profiles.get_company(company_id)
         return json.dumps(company.model_dump(), indent=2, default=str)
     except LinkedInMCPError as e:
         raise ToolError(str(e)) from e
@@ -57,16 +50,12 @@ async def analyze_profile(profile_id: str) -> str:
     """
     try:
         ctx = await get_ctx()
+        await ctx.initialize_browser()
         if not ctx.profile_analyzer._ai:
             raise ToolError("AI provider not configured. Set ANTHROPIC_API_KEY.")
 
         profile_id = await ctx.profiles.resolve_profile_id(profile_id)
-
-        # Resolve tenant context
-        tenant = await ctx.tenants.get_or_create_default_tenant()
-
-        # Use hybrid strategy for maximum data fidelity (recovers missing skills/exp from browser)
-        profile = await ctx.profiles.get_profile(tenant.id, profile_id)
+        profile = await ctx.profiles.get_profile(profile_id)
         analysis = await ctx.profile_analyzer.analyze(profile.model_dump())
         return json.dumps(analysis, indent=2, default=str)
     except LinkedInMCPError as e:
@@ -90,7 +79,7 @@ async def update_profile(
     try:
         ctx = await get_ctx()
         await ctx.initialize_browser()
-        result = await ctx.profiles.update_current_user_profile(
+        result = await ctx.browser.update_profile(
             headline=headline, summary=summary
         )
 
@@ -131,7 +120,7 @@ async def add_experience(
     try:
         ctx = await get_ctx()
         await ctx.initialize_browser()
-        result = await ctx.profiles.upsert_experience(
+        result = await ctx.browser.upsert_experience(
             title=title,
             company=company,
             employment_type=employment_type,
@@ -173,7 +162,7 @@ async def edit_experience(
     try:
         ctx = await get_ctx()
         await ctx.initialize_browser()
-        result = await ctx.profiles.upsert_experience(
+        result = await ctx.browser.upsert_experience(
             position_id=position_id,
             title=title,
             company=company,
@@ -202,7 +191,7 @@ async def remove_experience(
     try:
         ctx = await get_ctx()
         await ctx.initialize_browser()
-        result = await ctx.profiles.remove_experience(company=company, title=title)
+        result = await ctx.browser.remove_experience(company=company, title=title)
         if result["status"] == "success":
             return result["message"]
 
@@ -228,7 +217,7 @@ async def manage_skills(
     try:
         ctx = await get_ctx()
         await ctx.initialize_browser()
-        result = await ctx.profiles.manage_skills(skill_name=skill_name, action=action)
+        result = await ctx.browser.manage_skills(skill_name=skill_name, action=action)
         if result["status"] == "success":
             return result["message"]
 
