@@ -1,3 +1,0 @@
-from .experience import ProfileExperienceRepository as ProfileExperienceRepository
-from .education import ProfileEducationRepository as ProfileEducationRepository
-from .skill import ProfileSkillRepository as ProfileSkillRepository
