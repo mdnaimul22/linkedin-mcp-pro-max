@@ -156,15 +156,27 @@ class ProfileEditor:
                     'select[id$="-dateRange-start-date-year-select"]'
                 ).select_option(label=start_date_year)
 
-            # Current role checkbox
-            current_label = self.page.locator(
-                'label:has-text("I am currently working in this role")'
-            ).first
-            current_input = self.page.locator('input[id$="-isCurrent"]').first
-            if await current_input.is_visible():
-                if is_current != await current_input.is_checked():
-                    await current_label.click()
+            # Current role checkbox logic
+            # The most reliable way to check the toggle state is by looking at the end-date dropdown's disabled state
+            end_date_select = self.page.locator('select[id$="-dateRange-end-date"]').first
+            is_end_date_disabled = True
+            if await end_date_select.count() > 0:
+                is_end_date_disabled = await end_date_select.evaluate("el => el.disabled")
+
+            needs_toggle = False
+            if is_current and not is_end_date_disabled:
+                # User is current, but end date is enabled -> needs checking
+                needs_toggle = True
+            elif not is_current and is_end_date_disabled:
+                # User is not current, but end date is disabled -> needs unchecking
+                needs_toggle = True
+
+            if needs_toggle:
+                try:
+                    await self.page.locator('label:has-text("I am currently working in this role"), label[for$="-isCurrent"]').first.click(force=True)
                     await asyncio.sleep(1)
+                except Exception as e:
+                    logger.warning(f"Failed to toggle is_current: {e}")
 
             if not is_current:
                 if end_date_month:
