@@ -68,12 +68,24 @@ class ApiExecutor:
         if url.startswith("/"):
             url = f"https://www.linkedin.com{url}"
 
+        # Extract JSESSIONID from cookies for the CSRF token
+        cookies = await self._page.context.cookies()
+        csrf_token = None
+        for c in cookies:
+            if c["name"] == "JSESSIONID":
+                # LinkedIn cookie values are often enclosed in double quotes
+                csrf_token = c["value"].strip('"')
+                break
+
         # Build headers — browser session carries auth cookies automatically
         headers = {
             "accept": "application/json",
             "accept-language": "en-US,en;q=0.9",
             "x-restli-protocol-version": "2.0.0",
         }
+        if csrf_token:
+            headers["csrf-token"] = csrf_token
+
         if extra_headers:
             headers.update(extra_headers)
 
