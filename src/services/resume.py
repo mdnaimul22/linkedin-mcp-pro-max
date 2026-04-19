@@ -12,7 +12,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+
 
 from providers.base import BaseProvider
 from schema.document import (
@@ -54,13 +54,12 @@ class ResumeGeneratorService:
 
     async def generate_resume(
         self,
-        tenant_id: UUID,
         profile_id: str,
         template: str = "modern",
         output_format: str = "html",
     ) -> GeneratedDocument:
         """Generate a resume from a LinkedIn profile."""
-        profile = await self._profiles.get_profile(tenant_id, profile_id)
+        profile = await self._profiles.get_profile(profile_id)
         profile_data = profile.model_dump()
 
         enhanced = None
@@ -75,14 +74,13 @@ class ResumeGeneratorService:
 
     async def tailor_resume(
         self,
-        tenant_id: UUID,
         profile_id: str,
         job_id: str,
         template: str = "modern",
         output_format: str = "html",
     ) -> GeneratedDocument:
         """Generate a resume tailored to a specific job."""
-        profile = await self._profiles.get_profile(tenant_id, profile_id)
+        profile = await self._profiles.get_profile(profile_id)
         job = await self._jobs.get_job_details(job_id)
         profile_data = profile.model_dump()
         job_data = job.model_dump()

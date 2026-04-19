@@ -13,7 +13,7 @@ Lifecycle
 ---------
 1. `get_ctx()` → creates AppContext singleton, wires eager services.
 2. `AppContext.initialize_browser()` → starts browser, wires lazy services.
-3. `app_lifespan()` → manages DB schema init and graceful shutdown.
+3. `app_lifespan()` → manages graceful shutdown.
 """
 
 from __future__ import annotations
@@ -25,11 +25,11 @@ from typing import TYPE_CHECKING, Any, AsyncIterator
 from fastmcp import FastMCP
 
 from config.settings import Settings, get_settings
-from db.database import DatabaseService
 from api.linkedin import LinkedInClient
 from browser.manager import BrowserManager, create_browser
 from browser.session import SessionManager
 from providers import BaseProvider, ClaudeProvider, OpenAIProvider
+from providers.image import ImageProvider
 from api.executor import ApiExecutor
 from services.helpers import JSONCache
 
@@ -41,8 +41,6 @@ if TYPE_CHECKING:
     from services.resume import ResumeGeneratorService
     from services.cover_letter import CoverLetterGeneratorService
     from services.content import ContentService
-    from services.tenant import TenantService
-    from services.user import UserService
     from services.profile_analyzer import ProfileAnalyzerService
     from services.template import TemplateManager
 
@@ -56,7 +54,7 @@ class AppContext:
 
     All services are wired automatically via the registry — no manual
     field declarations needed for new services. Infrastructure components
-    (browser, DB, AI provider) are managed explicitly as they have
+    (browser, AI provider) are managed explicitly as they have
     complex lifecycle requirements.
 
     Service access:
@@ -68,9 +66,9 @@ class AppContext:
     settings: Settings
     sessions: SessionManager
     client: LinkedInClient
-    db: DatabaseService
     cache: JSONCache = field(init=False)
     ai: BaseProvider | None = field(init=False)
+    image_provider: ImageProvider | None = field(init=False)
 
     # Infrastructure components (managed explicitly)
     browser: BrowserManager | None = field(default=None)
@@ -98,13 +96,27 @@ class AppContext:
         else:
             self.ai = None
 
+        # ── Image Generation Provider (Google Gemini) ─────────────────────────
+        if self.settings.has_image_gen:
+            self.image_provider = ImageProvider(
+                api_key=self.settings.gemini_api_key,
+                model=self.settings.gemini_image_model,
+            )
+        else:
+            self.image_provider = None
+
         # ── Auto-Wire Eager Services ───────────────────────────────────────
         # The registry scans services/ and instantiates all non-lazy services.
         self._wire_services(lazy=False)
 
     def _wire_services(self, lazy: bool) -> None:
         """
-        Wire services from the registry.
+        Wire services from the registry using multi-pass resolution.
+
+        Services with factory lambdas may reference other services on `self`
+        that haven't been wired yet (e.g., cover_letter_gen → ctx.profiles).
+        A multi-pass approach retries failed services until all resolve or
+        no further progress can be made.
 
         Args:
             lazy: If True, wire only lazy (browser-dependent) services.
@@ -112,24 +124,36 @@ class AppContext:
         """
         from helpers.registry import get_services
 
-        for meta in get_services():
-            if meta.lazy != lazy:
-                continue
-            try:
-                if meta.factory:
-                    instance = meta.factory(self)
-                else:
-                    kwargs = {dep: getattr(self, dep, None) for dep in meta.deps}
-                    instance = meta.cls(**kwargs)
-                setattr(self, meta.attr, instance)
-                logger.debug("Wired service: %s → %s", meta.attr, meta.cls.__name__)
-            except Exception as exc:
-                logger.error(
-                    "Failed to wire service '%s' (%s): %s",
-                    meta.attr,
-                    meta.cls.__name__,
-                    exc,
-                )
+        pending = [m for m in get_services() if m.lazy == lazy]
+        max_passes = len(pending) + 1  # guaranteed to converge
+
+        for pass_num in range(1, max_passes + 1):
+            still_pending = []
+            for meta in pending:
+                try:
+                    if meta.factory:
+                        instance = meta.factory(self)
+                    else:
+                        kwargs = {dep: getattr(self, dep, None) for dep in meta.deps}
+                        instance = meta.cls(**kwargs)
+                    setattr(self, meta.attr, instance)
+                    logger.debug("Wired service: %s → %s (pass %d)", meta.attr, meta.cls.__name__, pass_num)
+                except Exception as exc:
+                    still_pending.append((meta, exc))
+
+            if not still_pending:
+                break  # all wired
+            if len(still_pending) == len(pending):
+                # No progress — log remaining failures and stop
+                for meta, exc in still_pending:
+                    logger.error(
+                        "Failed to wire service '%s' (%s): %s",
+                        meta.attr,
+                        meta.cls.__name__,
+                        exc,
+                    )
+                break
+            pending = [m for m, _ in still_pending]
 
     async def initialize_browser(self) -> None:
         """
@@ -174,10 +198,9 @@ async def get_ctx() -> AppContext:
     global _context
     if not _context:
         settings = get_settings()
-        db = DatabaseService(settings.database_url)
         sessions = SessionManager(settings)
         client = LinkedInClient(settings)
-        _context = AppContext(settings, sessions, client, db)
+        _context = AppContext(settings, sessions, client)
     return _context
 
 
@@ -200,18 +223,12 @@ import tools  # noqa: E402, F401  — triggers tools/__init__.py discovery
 @mcp.lifespan()
 async def app_lifespan(server: FastMCP) -> AsyncIterator[None]:
     """Manage MCP server startup and graceful shutdown."""
-    ctx = await get_ctx()
-
-    # Ensure DB schema and default tenant are ready
-    async with ctx.db.get_session() as _:
-        await ctx.tenants.get_or_create_default_tenant()
-
     yield
 
     # Graceful shutdown
+    ctx = await get_ctx()
     if ctx.browser:
         await ctx.browser.close()
-    await ctx.db.close()
 
 
 # ── CLI Session Commands ───────────────────────────────────────────────────────

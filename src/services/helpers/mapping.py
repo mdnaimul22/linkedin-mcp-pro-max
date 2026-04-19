@@ -1,16 +1,16 @@
-"""Mapping utilities between Source Data (API, Browser, DB) and Pydantic Schemas.
+"""Mapping utilities between Source Data (API, Browser) and Pydantic Schemas.
 
 This module acts as a bridge between Level 2 (Infrastructure) and Level 1 (Schema).
 It ensures that the Service Layer (Level 3) always receives standardized Domain Models.
 
 Dependency Rule:
-    imports FROM: schema, db.tables
-    MUST NOT import: api, browser, session, providers, tools, config
+    imports FROM: schema
+    MUST NOT import: api, browser, session, providers, tools, config, db
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, List
 
 from schema import (
     Certification,
@@ -20,13 +20,6 @@ from schema import (
     Language,
     Profile,
     JobDetails,
-)
-from db.tables import (
-    Company,
-    LinkedInProfileGlobal,
-    ProfileEducation,
-    ProfileExperience,
-    ProfileSkill,
 )
 
 logger = logging.getLogger("linkedin-mcp.services.helpers.mapping")
@@ -68,96 +61,6 @@ def _format_date_obj(date_obj: dict[str, Any] | None) -> str:
         ]
         return f"{months[min(month, 12)]} {year}"
     return str(year) if year else ""
-
-
-# --- DB to Schema Mappings ---
-
-
-def map_experience_db(record: ProfileExperience) -> Experience:
-    """Map DB ProfileExperience to Schema Experience."""
-    return Experience(
-        title=record.title or "",
-        company=record.company_name or "",
-        location=record.location or "",
-        start_date=record.started_at.strftime("%Y-%m-%d") if record.started_at else "",
-        end_date=record.ended_at.strftime("%Y-%m-%d")
-        if record.ended_at
-        else ("Present" if record.is_current else ""),
-        description=record.description or "",
-    )
-
-
-def map_education_db(record: ProfileEducation) -> Education:
-    """Map DB ProfileEducation to Schema Education."""
-    return Education(
-        school=record.institution or "",
-        degree=record.degree or "",
-        field_of_study=record.field_of_study or "",
-        start_date=record.started_at.strftime("%Y-%m-%d") if record.started_at else "",
-        end_date=record.ended_at.strftime("%Y-%m-%d") if record.ended_at else "",
-    )
-
-
-def map_profile_db(
-    profile: LinkedInProfileGlobal,
-    experiences: Optional[List[ProfileExperience]] = None,
-    education: Optional[List[ProfileEducation]] = None,
-    skills: Optional[List[ProfileSkill]] = None,
-) -> Profile:
-    """Map DB LinkedInProfileGlobal and its relations to Schema Profile."""
-    # Deduplicate experiences
-    seen_exp = set()
-    exp_list = []
-    for e in (experiences or []):
-        exp = map_experience_db(e)
-        identifier = (exp.title, exp.company, exp.start_date, exp.end_date)
-        if identifier not in seen_exp:
-            seen_exp.add(identifier)
-            exp_list.append(exp)
-
-    edu_list = [map_education_db(e) for e in (education or [])]
-
-    # Deduplicate skills
-    seen_skills = set()
-    skill_list = []
-    for s in (skills or []):
-        if s.skill_name and s.skill_name not in seen_skills:
-            seen_skills.add(s.skill_name)
-            skill_list.append(s.skill_name)
-
-    return Profile(
-        profile_id=profile.linkedin_id or profile.profile_url,
-        name=profile.full_name
-        or f"{profile.first_name or ''} {profile.last_name or ''}".strip(),
-        headline=profile.headline or "",
-        summary=profile.summary or "",
-        location=profile.location or "",
-        industry=profile.industry or "",
-        email=profile.email or "",
-        phone=profile.phone or "",
-        profile_url=profile.profile_url,
-        experience=exp_list,
-        education=edu_list,
-        skills=skill_list,
-        certifications=[],
-        languages=[],
-    )
-
-
-def map_company_db(record: Company) -> CompanyInfo:
-    """Map DB Company to Schema CompanyInfo."""
-    return CompanyInfo(
-        company_id=record.linkedin_id or str(record.id),
-        name=record.name,
-        tagline="",
-        description=record.description or "",
-        website=record.website or "",
-        industry=record.industry or "",
-        company_size=record.company_size or "",
-        headquarters=record.headquarters or "",
-        specialties=record.specialties or [],
-        url=record.linkedin_url or "",
-    )
 
 
 # --- API (JSON) to Schema Mappings ---

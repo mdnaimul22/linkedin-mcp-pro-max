@@ -95,10 +95,17 @@ class Settings(BaseSettings):
         default=20, validation_alias="LINKEDIN_MAX_SEARCH_RESULTS"
     )
 
-    # Database settings
-    database_url: str = Field(default="", validation_alias="DATABASE_URL")
-    database_schema: str = Field(default="public", validation_alias="DATABASE_SCHEMA")
     debug: bool = Field(default=False, validation_alias="DEBUG")
+
+    # Image generation settings (Google Gemini — configured via .env)
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias="GEMINI_API_KEY",
+    )
+    gemini_image_model: str = Field(
+        default="gemini-2.5-flash-image",
+        validation_alias="GEMINI_IMAGE_MODEL",
+    )
 
     # Session constants
     source_profile_dir_name: str = "profile"
@@ -184,6 +191,11 @@ class Settings(BaseSettings):
                 and self.openai_api_key.get_secret_value()
             )
         return False
+
+    @property
+    def has_image_gen(self) -> bool:
+        """Whether image generation is available (Gemini API key configured)."""
+        return bool(self.gemini_api_key)
 
     def ensure_dirs(self) -> None:
         """Create required directories if they don't exist."""

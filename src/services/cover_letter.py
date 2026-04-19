@@ -12,7 +12,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+
 
 from providers.base import BaseProvider
 from schema.document import CoverLetterContent, GeneratedDocument
@@ -48,14 +48,13 @@ class CoverLetterGeneratorService:
 
     async def generate_cover_letter(
         self,
-        tenant_id: UUID,
         profile_id: str,
         job_id: str,
         template: str = "professional",
         output_format: str = "html",
     ) -> GeneratedDocument:
         """Generate a personalized cover letter for a job."""
-        profile = await self._profiles.get_profile(tenant_id, profile_id)
+        profile = await self._profiles.get_profile(profile_id)
         job = await self._jobs.get_job_details(job_id)
 
         profile_data = profile.model_dump()
