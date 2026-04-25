@@ -22,13 +22,18 @@ from typing import TYPE_CHECKING, AsyncIterator
 from fastmcp import FastMCP
 
 from config.settings import Settings, get_settings
+
+from providers.image import ImageProvider
 from providers.linkedin import LinkedInClient
+from providers import BaseProvider, ClaudeProvider, OpenAIProvider
+
 from browser.manager import Manager, create_browser
 from browser.session import Session
-from providers import BaseProvider, ClaudeProvider, OpenAIProvider
-from providers.image import ImageProvider
 from browser.helpers.executor import ApiExecutor
+
 from services.helpers import JSONCache
+from services.auth import AuthResolver
+
 from helpers.registry import discover_all, get_services
 
 if TYPE_CHECKING:
@@ -192,8 +197,6 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[None]:
 
 
 async def run_session_commands(settings: Settings) -> bool:
-    """Handle CLI lifecycle commands: --login, --login-auto, --status, --logout."""
-    from services.auth import AuthResolver
 
     ctx = await get_ctx()
     await ctx.initialize_browser()

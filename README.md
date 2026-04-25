@@ -209,7 +209,6 @@ uv run linkedin-mcp-pro-max             # Start MCP server
 uv run linkedin-mcp-pro-max --login     # Autonomous headless login
 uv run linkedin-mcp-pro-max --status    # Check authentication status
 uv run linkedin-mcp-pro-max --logout    # Clear session and cookies
-uv run ty check                         # Type-check the project
 ```
 
 ---
