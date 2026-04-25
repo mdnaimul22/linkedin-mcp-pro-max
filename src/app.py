@@ -108,8 +108,12 @@ class AppContext:
 
     async def initialize_browser(self) -> None:
         """Provision the stealth browser and wire dependent services."""
-        if self.browser:
-            return
+        # Check if browser exists and is still connected/active
+        try:
+            if self.browser and getattr(self.browser, "_page", None) and not self.browser._page.is_closed():
+                return
+        except Exception:
+            pass
 
         self.browser = await create_browser(
             session_manager=self.sessions,
