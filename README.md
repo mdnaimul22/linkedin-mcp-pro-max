@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="#features">
-    <img src="https://img.shields.io/badge/Tools-24_Available-blue?style=for-the-badge&logo=rocket" alt="Tools">
+    <img src="https://img.shields.io/badge/Tools-14_Unified-blue?style=for-the-badge&logo=rocket" alt="Tools">
   </a>
   <a href="https://github.com/astral-sh/uv">
     <img src="https://img.shields.io/badge/Package_Manager-uv-purple?style=for-the-badge&logo=python" alt="UV">
@@ -92,34 +92,24 @@ Add to your `claude_desktop_config.json`:
 
 ---
 
-## The MCP Toolkit (24 Tools)
+## The MCP Toolkit (14 Unified Tools)
 
-| Category | Tool | Description |
-| :--- | :--- | :--- |
-| **Profile** | `get_profile` | Scrape deep profile data (experience, education, skills) |
-| | `analyze_profile` | AI-driven optimization feedback on profile metrics |
-| | `update_profile` | Update your headline and summary instantly |
-| | `add_experience` | Add a new professional experience securely |
-| | `edit_experience` | Edit an existing experience entry |
-| | `remove_experience` | Securely remove an unwanted experience entry |
-| | `manage_skills` | Add or delete skills from your profile |
-| **Intel & Jobs** | `search_jobs` | Search open positions with granular filtering |
-| | `get_job_details` | Get the full details of a specific job ID |
-| | `get_recommended_jobs` | Fetch personalized job recommendations |
-| | `get_company` | Extract detailed corporate metadata |
-| **Content** | `create_linkedin_post` | Publish professional AI-generated posts autonomously |
-| | `interact_with_post` | Read, Like, or Comment on feed posts via URL |
-| **Documents** | `generate_resume` | AI-generate a professional resume dynamically |
-| | `tailor_resume` | Target your resume to match a specific Job ID |
-| | `generate_cover_letter` | Create a personalized contextualized cover letter |
-| | `list_templates` | View all available styling templates |
-| **CRM** | `track_application` | Log an application to the internal tracking schema |
-| | `list_applications` | List all active tracked job applications |
-| | `update_application_status` | Update status (interested/interviewing/rejected) |
-| **API Self-Healing** | `get_network_logs` | Discover hidden backend API patterns via proxy |
-| | `execute_linkedin_api` | Call raw LinkedIn internal voyager API endpoints |
-| | `save_api_pattern` | Persist a working endpoint signature to the cookbook |
-| | `list_api_patterns` | List all saved API signature models |
+| Category | Tool | Actions | Description |
+| :--- | :--- | :--- | :--- |
+| **Profile** | `profile` | `get`, `analyze`, `update`, `update_cover_image` | Manage deep profile data, AI analysis, and identity updates |
+| | `experience` | `add`, `update`, `delete` | Manage professional experience entries |
+| | `education` | `add` | Manage education entries |
+| | `skills` | `add`, `delete` | Manage skills on your profile |
+| | `company` | - | Get detailed corporate metadata and insights |
+| **Jobs & Intel** | `job` | `search`, `details`, `recommended`, `apply` | Discover, analyze, and apply for job postings |
+| | `application` | `list`, `track`, `update` | Manage internal job application tracking |
+| **Content** | `create_linkedin_post` | - | Publish AI-generated posts autonomously |
+| | `interact_with_post` | `read`, `like`, `comment` | Engage with feed posts via URL |
+| **Documents** | `generate_resume` | - | Generate a professional resume from your profile |
+| | `tailor_resume` | - | Target your resume to match a specific Job ID |
+| | `generate_cover_letter` | - | Create a personalized contextual cover letter |
+| | `list_templates` | - | View all available document templates |
+| **System** | `server` | `restart` | Manage the MCP server lifecycle |
 
 ---
 
