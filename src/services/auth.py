@@ -94,44 +94,6 @@ class AuthResolver:
                 pass
             return False
 
-    async def login_interactively(self, timeout: int = 300) -> bool:
-        """Perform an interactive login via a visible browser window."""
-        print("\n" + "=" * 60)
-        print("LINKEDIN INTERACTIVE LOGIN")
-        print("=" * 60)
-        print("1. A browser window will open.")
-        print("2. Enter your LinkedIn credentials manually.")
-        print("3. Complete any two-factor authentication (2FA).")
-        print("4. Once you reach the LinkedIn Feed, the session will be saved.")
-        print("=" * 60 + "\n")
-
-        self.browser.driver.headless = False
-        await self.browser.start()
-        page = self.browser.page
-
-        try:
-            await page.goto("https://www.linkedin.com/login")
-            print("Waiting for login completion...")
-
-            loop = asyncio.get_running_loop()
-            start_time = loop.time()
-            while loop.time() - start_time < timeout:
-                if "linkedin.com/feed" in page.url:
-                    if await page.locator(".global-nav").count() > 0:
-                        print("\nLogin successful!")
-                        self.sessions.write_source_state()
-                        await self.browser.export_cookies()
-                        print(f"Session saved to {self.sessions.source_profile_dir}")
-                        return True
-                await asyncio.sleep(2)
-
-            print("\nLogin timed out.")
-            return False
-
-        except Exception as exc:
-            logger.error("Interactive login failed: %s", exc)
-            return False
-
     async def logout(self) -> bool:
         """Clear all stored LinkedIn profile and session artifacts."""
         try:

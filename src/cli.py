@@ -47,9 +47,6 @@ Examples:
     # Authentication & Session Commands
     auth_group = parser.add_argument_group("Authentication & Sessions")
     auth_group.add_argument(
-        "--login", action="store_true", help="Start interactive browser login (windowed)"
-    )
-    auth_group.add_argument(
         "--login-auto", action="store_true", help="Start autonomous headless login"
     )
     auth_group.add_argument(
@@ -82,7 +79,6 @@ Examples:
 
     # Map CLI arguments to settings model
     updates = {
-        "login": args.login,
         "status": args.status,
         "logout": args.logout,
         "login_auto": args.login_auto,
@@ -102,7 +98,7 @@ Examples:
         logger.warning(f"Configuration advisory: {', '.join(errors)}")
 
     # Execute session-specific commands if requested
-    if any([settings.login, settings.login_auto, settings.status, settings.logout]):
+    if any([settings.login_auto, settings.status, settings.logout]):
         logger.info("Executing lifecycle command...")
         was_session_cmd = asyncio.run(run_session_commands(settings))
         if was_session_cmd:

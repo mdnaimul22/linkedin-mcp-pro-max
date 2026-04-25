@@ -111,7 +111,6 @@ class Settings(BaseSettings):
     cookies_file_name: str = "cookies.json"
 
     # Session command flags (CLI-driven,    # Action flags (usually CLI-only, not in .env)
-    login: bool = False
     login_auto: bool = False
     status: bool = False
     logout: bool = False
