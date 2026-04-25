@@ -31,15 +31,16 @@ async def interact_with_post(
     try:
         ctx = await get_ctx()
         
-        # Ensure browser is initialized for these operations
-        await ctx.initialize_browser()
-        
-        result = await ctx.content.interact_with_post(
-            post_url=post_url, 
-            action=action, 
-            comment=comment
-        )
-        return json.dumps(result, indent=2, default=str)
+        async with ctx.lock:
+            # Ensure browser is initialized for these operations
+            await ctx.initialize_browser()
+            
+            result = await ctx.content.interact_with_post(
+                post_url=post_url, 
+                action=action, 
+                comment=comment
+            )
+            return json.dumps(result, indent=2, default=str)
         
     except Exception as e:
         logger.error(f"Post interaction failed: {e}")
@@ -98,15 +99,16 @@ async def create_linkedin_post(
 
     try:
         ctx = await get_ctx()
-        await ctx.initialize_browser()
+        async with ctx.lock:
+            await ctx.initialize_browser()
 
-        result = await ctx.content.generate_and_submit_post(
-            topic=topic,
-            tone=tone,
-            include_cta=include_cta,
-            include_image=include_image,
-        )
-        return json.dumps(result, indent=2, default=str)
+            result = await ctx.content.generate_and_submit_post(
+                topic=topic,
+                tone=tone,
+                include_cta=include_cta,
+                include_image=include_image,
+            )
+            return json.dumps(result, indent=2, default=str)
 
     except Exception as e:
         logger.error("create_linkedin_post failed: %s", e)

@@ -167,6 +167,7 @@ async def get_ctx() -> AppContext:
 
 mcp = FastMCP("LinkedIn MCP Pro Max")
 
+import tools  # Register all MCP tools
 discover_all()
 
 @mcp.lifespan()
