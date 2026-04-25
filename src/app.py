@@ -209,9 +209,9 @@ async def run_session_commands(settings: Settings) -> bool:
         print(f"Authenticated: {is_auth}")
         return True
 
-    if settings.login_auto:
-        success = await auth.login_automated()
-        print("Automated login successful." if success else "Automated login failed.")
+    if settings.login:
+        success = await auth.login()
+        print("Login successful." if success else "Login failed.")
         return True
 
     return False

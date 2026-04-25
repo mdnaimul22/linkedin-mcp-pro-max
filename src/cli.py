@@ -38,7 +38,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  linkedin-mcp-pro-max --login-auto        # Run automated headless login
+  linkedin-mcp-pro-max --login             # Run automated headless login
   linkedin-mcp-pro-max --status            # Check current auth status
   linkedin-mcp-pro-max --no-headless       # Start server in windowed mode
         """
@@ -47,7 +47,7 @@ Examples:
     # Authentication & Session Commands
     auth_group = parser.add_argument_group("Authentication & Sessions")
     auth_group.add_argument(
-        "--login-auto", action="store_true", help="Start autonomous headless login"
+        "--login", action="store_true", help="Start autonomous headless login"
     )
     auth_group.add_argument(
         "--status", action="store_true", help="Check current LinkedIn authentication status"
@@ -81,7 +81,7 @@ Examples:
     updates = {
         "status": args.status,
         "logout": args.logout,
-        "login_auto": args.login_auto,
+        "login": args.login,
     }
     if args.headless is not None:
         updates["headless"] = args.headless
@@ -98,7 +98,7 @@ Examples:
         logger.warning(f"Configuration advisory: {', '.join(errors)}")
 
     # Execute session-specific commands if requested
-    if any([settings.login_auto, settings.status, settings.logout]):
+    if any([settings.login, settings.status, settings.logout]):
         logger.info("Executing lifecycle command...")
         was_session_cmd = asyncio.run(run_session_commands(settings))
         if was_session_cmd:

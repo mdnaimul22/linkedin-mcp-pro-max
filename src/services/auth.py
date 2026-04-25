@@ -27,7 +27,7 @@ class AuthResolver:
         """Check if the current session is authenticated with LinkedIn."""
         return await validate_linkedin_auth(self.browser.page)
 
-    async def login_automated(self, timeout: int = 120) -> bool:
+    async def login(self, timeout: int = 120) -> bool:
         """Perform an autonomous headless login using stored credentials."""
         logger.info("Attempting autonomous headless login...")
         await self.browser.start()
