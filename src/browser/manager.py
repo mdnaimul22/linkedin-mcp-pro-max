@@ -187,6 +187,7 @@ class Manager:
         except Exception:
             return False
 
+    # --- PROFILE ---
     async def scrape_profile_by_id(self, profile_id: str) -> dict[str, Any]:
         """Scrape raw profile data. Mapping is caller's responsibility."""
         return await self.profile_scraper.scrape(profile_id)
@@ -204,6 +205,11 @@ class Manager:
         pid = await self.get_current_profile_id()
         return await self.profile_editor.update_summary(pid, summary)
 
+    async def update_cover_image(self, image_path: str) -> dict[str, Any]:
+        pid = await self.get_current_profile_id()
+        return await self.profile_editor.update_cover_image(pid, image_path)
+
+    # --- EXPERIENCE ---
     async def upsert_experience(self, **kwargs: Any) -> dict[str, Any]:
         pid = await self.get_current_profile_id()
         return await self.profile_editor.upsert_experience(profile_id=pid, **kwargs)
@@ -212,18 +218,21 @@ class Manager:
         pid = await self.get_current_profile_id()
         return await self.profile_editor.remove_experience(pid, company, title)
 
-    async def manage_skills(self, skill_name: str, action: str = "add") -> dict[str, Any]:
-        pid = await self.get_current_profile_id()
-        return await self.profile_editor.manage_skills(pid, skill_name, action)
-
+    # --- EDUCATION ---
     async def upsert_education(self, **kwargs: Any) -> dict[str, Any]:
         pid = await self.get_current_profile_id()
         return await self.profile_editor.upsert_education(profile_id=pid, **kwargs)
 
-    async def update_cover_image(self, image_path: str) -> dict[str, Any]:
+    async def remove_education(self, school: str, degree: str) -> dict[str, Any]:
         pid = await self.get_current_profile_id()
-        return await self.profile_editor.update_cover_image(pid, image_path)
+        return await self.profile_editor.remove_education(pid, school, degree)
 
+    # --- SKILLS ---
+    async def manage_skills(self, skill_name: str, action: str = "add") -> dict[str, Any]:
+        pid = await self.get_current_profile_id()
+        return await self.profile_editor.manage_skills(pid, skill_name, action)
+
+    # --- POSTS / CONTENT ---
     async def read_post(self, post_url: str) -> dict[str, Any]:
         await self.page.goto(post_url, wait_until="domcontentloaded")
         await stabilize_navigation(self.page)
