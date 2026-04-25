@@ -9,6 +9,7 @@
 <p align="center">
   <a href="#features">
     <img src="https://img.shields.io/badge/Tools-24_Available-blue?style=for-the-badge&logo=rocket" alt="Tools">
+[![SafeSkill 50/100](https://img.shields.io/badge/SafeSkill-50%2F100_Use%20with%20Caution-orange)](https://safeskill.dev/scan/mdnaimul22-linkedin-mcp-pro-max)
   </a>
   <a href="https://github.com/astral-sh/uv">
     <img src="https://img.shields.io/badge/Package_Manager-uv-purple?style=for-the-badge&logo=python" alt="UV">
