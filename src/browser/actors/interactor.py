@@ -1,145 +1,154 @@
 import asyncio
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from patchright.async_api import Page
-from browser.helpers.dom import wait_for_any_selector
+from browser.helpers.executor import ApiExecutor
 
-logger = logging.getLogger("browser.actors.interactor")
-
+logger = logging.getLogger("linkedin-mcp.browser.actors.interactor")
 
 class ContentInteractor:
-    """Actor responsible for engaging with posts and articles."""
+    """
+    LinkedIn Content Interaction Actor.
+    Uses ApiExecutor for semantic, selector-free automation.
+    """
 
     def __init__(self, page: Page) -> None:
         self.page = page
-
-    async def like_post(self) -> Dict[str, Any]:
-        """Likes the currently loaded post if not already liked.
-        
-        Returns:
-            dict indicating success, action taken, and message.
-        """
-        try:
-            # Check if button exists and its state in one evaluation to avoid race conditions
-            liked = await self.page.evaluate('''() => {
-                const likeButton = document.querySelector('button.react-button__trigger');
-                if (!likeButton) return null; // Button not found 
-                
-                const isLiked = likeButton.getAttribute('aria-pressed') === 'true';
-                if (!isLiked) {
-                    likeButton.click();
-                    return true; // We clicked it
-                }
-                return false; // It was already liked
-            }''')
-            
-            if liked is None:
-                return {"status": "error", "message": "Like button not found on the page."}
-            elif liked:
-                return {"status": "success", "action": "like", "performed": True, "message": "Successfully liked the post."}
-            else:
-                return {"status": "success", "action": "like", "performed": False, "message": "Post was already liked."}
-                
-        except Exception as e:
-            logger.error(f"Failed to like post: {e}")
-            return {"status": "error", "message": f"Exception during like action: {e}"}
+        self.executor = ApiExecutor(page)
 
     async def comment_on_post(self, text: str) -> Dict[str, Any]:
-        """Posts a comment on the currently loaded post.
-        
-        Args:
-            text: The text content of the comment to post.
-            
-        Returns:
-            dict indicating success and message.
-        """
+        """Adds a comment to the currently open post semantically."""
         try:
-            # 1. Click to open comment box
-            trigger_selector = "button.comments-comment-box__trigger"
-            await wait_for_any_selector(self.page, [trigger_selector])
-            await self.page.click(trigger_selector)
+            # Discover and fill comment editor
+            discovery = await self.executor.discover()
             
-            # 2. Fill the comment text
-            editor_selector = ".ql-editor"
-            await self.page.wait_for_selector(editor_selector, state="visible")
-            await self.page.fill(editor_selector, text)
+            # Map "comment" or "write" to the editor
+            success = await self.executor.fill_semantic_field("comment", text, discovery)
+            if not success:
+                success = await self.executor.fill_semantic_field("write", text, discovery)
             
-            # 3. Submit
-            submit_selector = "button.comments-comment-box__submit-button"
-            await self.page.click(submit_selector)
+            if not success:
+                 return {"status": "error", "message": "Could not find comment editor semantically."}
+
+            # Click Post/Comment button
+            clicked = await self.executor.click_button("Post", discovery)
+            if not clicked:
+                clicked = await self.executor.click_button("Comment", discovery)
             
-            # 4. Wait for submission to complete
+            if not clicked:
+                return {"status": "error", "message": "Could not find submit button semantically."}
+
             await asyncio.sleep(2.0)
-            
             return {
                 "status": "success",
                 "action": "comment",
-                "message": "Comment posted successfully."
+                "message": "Comment posted successfully semantically."
             }
-            
         except Exception as e:
-            logger.error(f"Failed to comment on post: {e}")
-            return {"status": "error", "message": f"Exception during comment action: {e}"}
+            logger.error(f"Semantic comment failed: {e}")
+            return {"status": "error", "message": str(e)}
 
-    async def create_post(self, text: str) -> Dict[str, Any]:
-        """Creates a new post on the user's feed.
-        
-        Args:
-            text: The text content of the post to publish.
-            
-        Returns:
-            dict indicating success and message.
-        """
+    async def create_post(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
+        """Creates a new post using semantic field discovery and smart automation."""
         try:
-            logger.info("Starting post creation flow...")
-            # 1. Ensure we are on the feed page
-            await self.page.goto("https://www.linkedin.com/feed/")
-            await self.page.wait_for_load_state("domcontentloaded")
+            logger.info("Starting semantic post creation flow...")
+            await self.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
             
-            # 2. Click "Start a post"
-            start_post_selector = "button.share-box-feed-entry__trigger, button[aria-label='Start a post']"
-            await self.page.wait_for_selector(start_post_selector, state="visible", timeout=10000)
-            await self.page.click(start_post_selector)
+            # 1. Open Post Modal
+            discovery = await self.executor.discover()
             
-            # 3. Wait for modal text editor
-            editor_selector = "div.ql-editor[contenteditable='true']"
-            await self.page.wait_for_selector(editor_selector, state="visible", timeout=10000)
+            # Try "Start a post" or "Write post" first to avoid file picker
+            trigger_labels = ["Start a post", "Write post"]
+            if image_path:
+                trigger_labels.insert(0, "Photo")
+            else:
+                trigger_labels.append("Photo") # Last resort
+
+            trigger_success = False
+            for label in trigger_labels:
+                if await self.executor.click_button(label, discovery):
+                    trigger_success = True
+                    break
             
-            # 4. Fill text
-            await self.page.fill(editor_selector, text)
-            await asyncio.sleep(1.0) # wait for button to become enabled
+            if not trigger_success:
+                # Fallback to coordinate-less discovery if labels fail
+                logger.warning("Semantic post triggers failed, trying fallback discovery...")
+                await asyncio.sleep(2)
+                discovery = await self.executor.discover()
+
+            # 2. Handle Image if provided
+            if image_path:
+                # Click "Add media" or "Photo" inside modal
+                async with self.page.expect_file_chooser() as fc_info:
+                    media_clicked = await self.executor.click_button("Add media", discovery)
+                    if not media_clicked:
+                        media_clicked = await self.executor.click_button("Photo", discovery)
+                
+                if media_clicked:
+                    file_chooser = await fc_info.value
+                    await file_chooser.set_files(image_path)
+                    await asyncio.sleep(2)
+                    # Click "Done" or "Next"
+                    await self.executor.click_button("Done")
+                    await asyncio.sleep(2)
+
+            # 3. Fill Post Content
+            # Wait for modal to settle
+            await asyncio.sleep(2)
+            modal_discovery = await self.executor.discover()
             
-            # 5. Click the "Post" button
-            submit_selector = "button.share-actions__primary-action, button[data-test-id='share-actions__primary-action']"
-            submit_button = self.page.locator(submit_selector).first
+            # Fill the editor (usually labeled "post", "write", or has placeholder)
+            fill_success = await self.executor.smart_fill({
+                "post": text,
+                "write": text,
+                "share": text,
+                "editor": text
+            }, modal_discovery)
             
-            # Ensure the button is enabled
-            is_disabled = await submit_button.get_attribute("disabled")
-            if is_disabled is not None:
-                return {"status": "error", "message": "Post button remains disabled. Text may be invalid."}
+            if not any(v == "success" for v in fill_success.values()):
+                # Final attempt: find any large contenteditable or textarea
+                logger.info("Semantic fill failed, trying broad discovery...")
+                for f in (modal_discovery.textareas + modal_discovery.inputs):
+                    if f.is_contenteditable or f.tag == "textarea":
+                         logger.info(f"Found candidate editor: {f.tag} (id={f.id}). Filling...")
+                         await self.page.locator(f"#{f.id}").first.click()
+                         await self.page.locator(f"#{f.id}").first.fill(text)
+                         break
+
+            # 4. Click Post
+            await asyncio.sleep(1)
+            posted = await self.executor.click_button("Post")
+            if not posted:
+                # Direct selector fallback for LinkedIn's specific post button classes
+                logger.info("Semantic 'Post' button not found, trying CSS fallbacks...")
+                post_selectors = [
+                    "button.share-actions__primary-action", 
+                    "button.share-box-footer__primary-btn",
+                    "[data-test-id='share-actions__primary-action']"
+                ]
+                for sel in post_selectors:
+                    try:
+                        btn = self.page.locator(sel).first
+                        if await btn.is_visible():
+                            await btn.click()
+                            posted = True
+                            break
+                    except: continue
             
-            await submit_button.click()
-            
-            # 6. Wait for modal to close (completion confirmation)
-            try:
-                await self.page.wait_for_selector("div.share-box-modal", state="hidden", timeout=10000)
-            except Exception:
-                logger.warning("Modal did not disappear explicitly, checking if post was successful...")
-            
-            # Wait a moment for network dispatch
-            await asyncio.sleep(2.0)
-            
+            if not posted:
+                return {"status": "error", "message": "Could not find 'Post' button semantically or via fallback."}
+
+            await asyncio.sleep(3)
             return {
                 "status": "success",
                 "action": "create_post",
-                "message": "Post submitted successfully.",
-                "length": len(text)
+                "message": "Post submitted successfully via semantic discovery."
             }
-            
-        except Exception as e:
-            logger.error(f"Failed to create post: {e}")
-            return {"status": "error", "message": f"Exception during post creation: {e}"}
 
+        except Exception as e:
+            logger.error(f"Semantic post creation failed: {e}")
+            await self.page.screenshot(path="semantic_post_failure.png")
+            return {"status": "error", "message": str(e)}
 
 # ── Registry Convention ───────────────────────────────────────────────────────
 from helpers.registry import ActorMeta

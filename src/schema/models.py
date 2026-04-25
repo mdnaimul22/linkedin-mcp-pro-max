@@ -459,6 +459,8 @@ class FieldInfo(BaseModel):
     aria_label: str | None = None
     required: bool = False
     disabled: bool = False
+    is_contenteditable: bool = False
+    selector: str | None = None
 
 
 class DiscoverySummary(BaseModel):

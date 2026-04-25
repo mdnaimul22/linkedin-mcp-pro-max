@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Tags we care about — extensible without touching core logic
-_DISCOVERABLE_TAGS: list[str] = ["input", "textarea", "select", "button"]
+_DISCOVERABLE_TAGS: list[str] = ["input", "textarea", "select", "button", "[contenteditable='true']"]
 
 _PAGE_LOAD_SETTLE_SECONDS: float = 3.0  # JS-heavy SPAs need time to render
 
@@ -73,7 +73,9 @@ def _extract_field(tag: Tag, soup: BeautifulSoup) -> FieldInfo:
         aria_label=tag.get("aria-label") or None,
         required=tag.has_attr("required"),
         disabled=tag.has_attr("disabled"),
+        is_contenteditable=tag.get("contenteditable") == "true",
         label=_resolve_label(tag, soup),
+        selector=f"#{tag.get('id')}" if tag.get("id") else None
     )
 
 
@@ -108,18 +110,17 @@ class ApiExecutor:
 
             result = DiscoveryResult(url=current_url)
 
-            for tag in soup.find_all(_DISCOVERABLE_TAGS):
+            for tag in soup.select(", ".join(_DISCOVERABLE_TAGS)):
                 field = _extract_field(tag, soup)
 
-                match tag.name:
-                    case "input":
-                        result.inputs.append(field)
-                    case "textarea":
-                        result.textareas.append(field)
-                    case "select":
-                        result.selects.append(field)
-                    case "button":
-                        result.buttons.append(field)
+                if tag.name == "input":
+                    result.inputs.append(field)
+                elif tag.name == "textarea" or tag.get("contenteditable") == "true":
+                    result.textareas.append(field)
+                elif tag.name == "select":
+                    result.selects.append(field)
+                elif tag.name == "button":
+                    result.buttons.append(field)
 
             result.rebuild_summary()
             return result
@@ -127,3 +128,104 @@ class ApiExecutor:
         except Exception as exc:
             logger.error("Field discovery failed: %s", exc)
             return DiscoveryResult(url=current_url, success=False, error=str(exc))
+
+    # --- Robust Automation & Self-Healing Methods ---
+
+    async def smart_fill(self, field_data: dict[str, Any], discovery: Optional[DiscoveryResult] = None) -> dict[str, str]:
+        """
+        Intelligently fill multiple fields based on semantic matching.
+        Eliminates the need for hardcoded selectors in actors.
+        """
+        if not discovery:
+            discovery = await self.discover()
+
+        results = {}
+        for key, value in field_data.items():
+            if not value: continue
+            success = await self.fill_semantic_field(key, str(value), discovery)
+            results[key] = "success" if success else "failed"
+            
+        return results
+
+    async def fill_semantic_field(self, key: str, value: str, discovery: DiscoveryResult) -> bool:
+        """Find the best matching input/textarea for a key and fill it."""
+        all_fields = discovery.inputs + discovery.textareas
+        
+        # Priority 1: Label match
+        target = next((f for f in all_fields if f.label and key.lower() in f.label.lower()), None)
+        
+        # Priority 2: Placeholder match
+        if not target:
+            target = next((f for f in all_fields if f.placeholder and key.lower() in f.placeholder.lower()), None)
+        
+        # Priority 3: ID/Name suffix match (common in LinkedIn)
+        if not target:
+            target = next((f for f in all_fields if (f.id and f.id.lower().endswith(f"-{key.lower()}")) or 
+                                               (f.name and f.name.lower().endswith(f"-{key.lower()}"))), None)
+
+        if target:
+            selector = target.selector or (f"#{target.id}" if target.id else None)
+            if not selector:
+                # Fallback to tag + placeholder/name if no ID or selector
+                if target.placeholder:
+                    selector = f'{target.tag}[placeholder="{target.placeholder}"]'
+                elif target.name:
+                    selector = f'{target.tag}[name="{target.name}"]'
+                else:
+                    return False # Truly anonymous field
+
+            try:
+                # Ensure the element is visible and interactive
+                locator = self._page.locator(selector).first
+                await locator.scroll_into_view_if_needed()
+                await locator.click() # Focus first
+                await locator.fill(value)
+                return True
+            except Exception as e:
+                logger.warning(f"Failed to fill semantic field '{key}': {e}")
+        
+        return False
+
+    async def click_button(self, label_query: str, discovery: Optional[DiscoveryResult] = None) -> bool:
+        """Find a button semantically by label, aria-label, or text and click it."""
+        if not discovery:
+            discovery = await self.discover()
+            
+        # 1. Check discovered buttons
+        for b in discovery.buttons:
+            if b.label and label_query.lower() in b.label.lower():
+                try:
+                    locator = self._page.locator(f"#{b.id}").first
+                    await locator.scroll_into_view_if_needed()
+                    await locator.click()
+                    return True
+                except: pass
+                
+        # 2. Direct locator fallback for text
+        try:
+            btn = self._page.locator(f'button:has-text("{label_query}"), [role="button"]:has-text("{label_query}")').first
+            if await btn.is_visible():
+                await btn.click()
+                return True
+        except: pass
+        
+        return False
+
+    async def select_by_label(self, label_query: str, option_label: str, discovery: Optional[DiscoveryResult] = None) -> bool:
+        """Find a select element by label and select an option."""
+        if not discovery:
+            discovery = await self.discover()
+            
+        target = next((f for f in discovery.selects if f.label and label_query.lower() in f.label.lower()), None)
+        
+        if target and target.id:
+            try:
+                await self._page.locator(f"#{target.id}").select_option(label=option_label)
+                return True
+            except Exception as e:
+                logger.warning(f"Failed to select option '{option_label}' for '{label_query}': {e}")
+        
+        return False
+
+# Export ActionExecutor for forward compatibility
+ActionExecutor = ApiExecutor
