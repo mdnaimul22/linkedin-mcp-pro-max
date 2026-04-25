@@ -121,38 +121,88 @@ class ProfileEditor:
             await stabilize_navigation(self.page)
             await self._force_notify_network_off()
 
-            await self.page.locator('input[id$="-title"]').first.fill(title)
-            await self.page.locator('input[id$="-requiredCompany"]').first.fill(company)
+            # SELF-HEALING: Use ApiExecutor to discover fields dynamically
+            from browser.helpers.executor import ApiExecutor
+            executor = ApiExecutor(self.page)
+            discovery = await executor.discover()
+
+            def find_field(label_query: str, fields: list):
+                for f in fields:
+                    if f.label and label_query.lower() in f.label.lower():
+                        return f
+                return None
+
+            # Map fields to values
+            field_map = {
+                "title": title,
+                "company": company,
+                "location": location,
+                "description": description,
+            }
+
+            for label_key, value in field_map.items():
+                if not value:
+                    continue
+                
+                # Discovery logic
+                search_label = "company" if label_key == "company" else label_key
+                field = find_field(search_label, discovery.inputs + discovery.textareas)
+                
+                if field and field.id:
+                    selector = f"#{field.id}"
+                    logger.debug("Discovery: matched '%s' to selector %s", label_key, selector)
+                    await self.page.locator(selector).first.fill(value)
+                    if label_key in ["company", "location"]:
+                        await asyncio.sleep(1.5)
+                        await self.page.keyboard.press("ArrowDown")
+                        await self.page.keyboard.press("Enter")
+                else:
+                    # Fallback
+                    selector = f'input[id$="-{label_key}"], textarea[id$="-{label_key}"]'
+                    if label_key == "company":
+                        selector = 'input[id$="-requiredCompany"]'
+                    elif label_key == "location":
+                        selector = 'input[id$="-geoPositionLocation"]'
+                    
+                    try:
+                        await self.page.locator(selector).first.fill(value)
+                        if label_key in ["company", "location"]:
+                            await asyncio.sleep(1.5)
+                            await self.page.keyboard.press("ArrowDown")
+                            await self.page.keyboard.press("Enter")
+                    except Exception:
+                        pass
 
             if employment_type:
-                try:
-                    await self.page.locator(
-                        'select[id$="-employmentStatus"]'
-                    ).select_option(label=employment_type)
-                except Exception:
-                    pass
-
-            if location:
-                await self.page.locator('input[id$="-geoPositionLocation"]').first.fill(
-                    location
-                )
-                await asyncio.sleep(1.5)
-                await self.page.keyboard.press("ArrowDown")
-                await self.page.keyboard.press("Enter")
-
-            if description:
-                await self.page.locator('textarea[id$="-description"]').first.fill(
-                    description
-                )
+                field = find_field("employment type", discovery.selects)
+                if field and field.id:
+                    await self.page.locator(f"#{field.id}").select_option(label=employment_type)
+                else:
+                    try:
+                        await self.page.locator('select[id$="-employmentStatus"]').select_option(label=employment_type)
+                    except Exception: pass
 
             if start_date_month:
-                await self.page.locator(
-                    'select[id$="-dateRange-start-date"]'
-                ).select_option(label=start_date_month)
+                field = find_field("start date", discovery.selects) # Usually "Month" is inside a fieldset or labeled
+                # Start date month select often has ID like ...-start-date
+                if field and field.id:
+                    await self.page.locator(f"#{field.id}").select_option(label=start_date_month)
+                else:
+                    await self.page.locator('select[id$="-dateRange-start-date"]').select_option(label=start_date_month)
+            
             if start_date_year:
-                await self.page.locator(
-                    'select[id$="-dateRange-start-date-year-select"]'
-                ).select_option(label=start_date_year)
+                field = find_field("start date", discovery.selects) # This might be tricky if labels are similar
+                # Year select usually has "year" in ID or label
+                year_field = None
+                for f in discovery.selects:
+                    if f.label and "year" in f.label.lower() and "start" in f.label.lower():
+                        year_field = f
+                        break
+                
+                if year_field and year_field.id:
+                    await self.page.locator(f"#{year_field.id}").select_option(label=start_date_year)
+                else:
+                    await self.page.locator('select[id$="-dateRange-start-date-year-select"]').select_option(label=start_date_year)
 
             # Current role checkbox logic
             # The most reliable way to check the toggle state is by looking at the end-date dropdown's disabled state
@@ -219,53 +269,76 @@ class ProfileEditor:
         if education_id:
             url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/education/{education_id}/"
         else:
+            # Check if we should try to find an existing one first to prevent duplicates
+            # (Future improvement: match by school/degree)
             url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/education/new/"
 
         try:
             await self.page.goto(url, wait_until="load", timeout=60000)
-            await stabilize_navigation(self.page)
-            await self._force_notify_network_off()
+            # SELF-HEALING: Use ApiExecutor to discover fields dynamically
+            from browser.helpers.executor import ApiExecutor
+            executor = ApiExecutor(self.page)
+            discovery = await executor.discover()
 
-            # Fill School
-            school_input = self.page.locator('input[id$="-school"]').first
-            await school_input.fill(school)
-            await asyncio.sleep(1.5)
-            await self.page.keyboard.press("ArrowDown")
-            await self.page.keyboard.press("Enter")
+            def find_field(label_query: str, fields: list):
+                for f in fields:
+                    if f.label and label_query.lower() in f.label.lower():
+                        return f
+                return None
 
-            # Fill Degree
-            degree_input = self.page.locator('input[id$="-degree"]').first
-            await degree_input.fill(degree)
-            await asyncio.sleep(1.5)
-            await self.page.keyboard.press("ArrowDown")
-            await self.page.keyboard.press("Enter")
+            # Map fields to values
+            field_map = {
+                "school": school,
+                "degree": degree,
+                "fieldOfStudy": field_of_study,
+                "grade": grade,
+                "description": description,
+            }
 
-            if field_of_study:
-                field_input = self.page.locator('input[id$="-fieldOfStudy"]').first
-                if await field_input.is_visible():
-                    await field_input.fill(field_of_study)
-                    await asyncio.sleep(1.5)
-                    await self.page.keyboard.press("ArrowDown")
-                    await self.page.keyboard.press("Enter")
+            for label_key, value in field_map.items():
+                if not value:
+                    continue
+                
+                # Try discovery first
+                field = find_field(label_key, discovery.inputs + discovery.textareas)
+                if field and field.id:
+                    selector = f"#{field.id}"
+                    logger.debug("Discovery: matched '%s' to selector %s", label_key, selector)
+                    await self.page.locator(selector).first.fill(value)
+                    if label_key in ["school", "degree", "fieldOfStudy"]:
+                        await asyncio.sleep(1.5)
+                        await self.page.keyboard.press("ArrowDown")
+                        await self.page.keyboard.press("Enter")
+                else:
+                    # Fallback to stable suffixes if discovery fails
+                    selector = f'input[id$="-{label_key}"], textarea[id$="-{label_key}"]'
+                    if label_key == "fieldOfStudy":
+                        selector = 'input[id$="-fieldOfStudy"]'
+                    
+                    logger.debug("Fallback: using suffix selector for '%s'", label_key)
+                    try:
+                        await self.page.locator(selector).first.fill(value)
+                        if label_key in ["school", "degree", "fieldOfStudy"]:
+                            await asyncio.sleep(1.5)
+                            await self.page.keyboard.press("ArrowDown")
+                            await self.page.keyboard.press("Enter")
+                    except Exception as e:
+                        logger.warning("Failed to fill field '%s': %s", label_key, e)
 
-            if grade:
-                grade_input = self.page.locator('input[id$="-grade"]').first
-                if await grade_input.is_visible():
-                    await grade_input.fill(grade)
-
+            # Date selects (Discovery for selects is also possible)
             if start_year:
-                await self.page.locator(
-                    'select[id$="-dateRange-start-date-year-select"]'
-                ).select_option(label=start_year)
-            if end_year:
-                await self.page.locator(
-                    'select[id$="-dateRange-end-date-year-select"]'
-                ).select_option(label=end_year)
+                field = find_field("start date", discovery.selects)
+                if field and field.id:
+                    await self.page.locator(f"#{field.id}").select_option(label=start_year)
+                else:
+                    await self.page.locator('select[id$="-dateRange-start-date-year-select"]').select_option(label=start_year)
 
-            if description:
-                await self.page.locator('textarea[id$="-description"]').first.fill(
-                    description
-                )
+            if end_year:
+                field = find_field("end date", discovery.selects)
+                if field and field.id:
+                    await self.page.locator(f"#{field.id}").select_option(label=end_year)
+                else:
+                    await self.page.locator('select[id$="-dateRange-end-date-year-select"]').select_option(label=end_year)
 
             await self.page.locator(
                 'button.artdeco-button--primary:has-text("Save")'
@@ -280,7 +353,78 @@ class ProfileEditor:
                     "suggestion": suggestion,
                 }
 
-            return {"status": "success", "message": "Education saved."}
+            return {"status": "success", "message": "Education saved.", "education_id": education_id}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    async def remove_education(
+        self,
+        profile_id: str,
+        school: str,
+        degree: str,
+    ) -> dict[str, Any]:
+        """Remove an education entry by matching school and degree."""
+        url = f"https://www.linkedin.com/in/{profile_id}/details/education/"
+        try:
+            await self.page.goto(url, wait_until="load", timeout=60000)
+            await stabilize_navigation(self.page)
+
+            # Find the education card containing the school and degree
+            education_items = self.page.locator("li.pvs-list__paged-list-item")
+            count = await education_items.count()
+
+            target_item = None
+            for i in range(count):
+                item = education_items.nth(i)
+                text = await item.inner_text()
+                # Use robust matching
+                if school.lower().strip() in text.lower() and degree.lower().strip() in text.lower():
+                    target_item = item
+                    break
+
+            if not target_item:
+                return {
+                    "status": "error",
+                    "message": f"Education at '{school}' with degree '{degree}' not found.",
+                }
+
+            # Click the edit button within this item
+            edit_button = target_item.locator("a[href*='/edit/forms/education/']").first
+            if not await edit_button.is_visible():
+                return {
+                    "status": "error",
+                    "message": "Edit button not found for this education entry.",
+                }
+
+            await edit_button.click()
+            await stabilize_navigation(self.page)
+
+            # Now we are in the edit modal. Click "Delete education"
+            delete_btn = self.page.locator(
+                'button.artdeco-button--secondary:has-text("Delete education"), button:has-text("Delete education")'
+            ).first
+            if not await delete_btn.is_visible():
+                return {
+                    "status": "error",
+                    "message": "Delete education button not found in modal.",
+                }
+
+            await delete_btn.click()
+            await asyncio.sleep(1)
+
+            # Confirm deletion modal
+            confirm_btn = self.page.locator(
+                'button.artdeco-button--primary:has-text("Delete")'
+            ).first
+            if await confirm_btn.is_visible():
+                await confirm_btn.click()
+
+            await asyncio.sleep(2)
+            return {
+                "status": "success",
+                "message": f"Successfully deleted education at '{school}' with degree '{degree}'.",
+            }
+
         except Exception as e:
             return {"status": "error", "message": str(e)}
 

@@ -98,7 +98,7 @@ Add to your `claude_desktop_config.json`:
 | :--- | :--- | :--- | :--- |
 | **Profile** | `profile` | `get`, `analyze`, `update`, `update_cover_image` | Manage deep profile data, AI analysis, and identity updates |
 | | `experience` | `add`, `update`, `delete` | Manage professional experience entries |
-| | `education` | `add` | Manage education entries |
+| | `education` | `add`, `update`, `delete` | Manage education entries |
 | | `skills` | `add`, `delete` | Manage skills on your profile |
 | | `company` | - | Get detailed corporate metadata and insights |
 | **Jobs & Intel** | `job` | `search`, `details`, `recommended`, `apply` | Discover, analyze, and apply for job postings |

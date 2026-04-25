@@ -264,7 +264,7 @@ async def skills(
 
 @mcp.tool()
 async def education(
-    action: Literal["add"],
+    action: Literal["add", "update", "delete"],
     school: str,
     degree: str,
     field_of_study: str | None = None,
@@ -272,11 +272,12 @@ async def education(
     start_year: str | None = None,
     end_year: str | None = None,
     description: str | None = None,
+    education_id: str | None = None,
 ) -> str:
     """Manage education entries on your LinkedIn profile.
 
     Args:
-        action: 'add',
+        action: 'add', 'update', or 'delete',
         school: School/University name,
         degree: Degree (e.g. 'Bachelor of Science'),
         field_of_study: Field of study (optional),
@@ -284,45 +285,47 @@ async def education(
         start_year: Start year string (e.g. '2018'),
         end_year: End year string (e.g. '2022'),
         description: Description of your studies (optional),
+        education_id: The ID of the education entry (required for 'update'),
     """
     allowed_args = {
-        "add": ["school", "degree", "field_of_study", "grade", "start_year", "end_year", "description"]
+        "add": ["school", "degree", "field_of_study", "grade", "start_year", "end_year", "description"],
+        "update": ["education_id", "school", "degree", "field_of_study", "grade", "start_year", "end_year", "description"],
+        "delete": ["school", "degree"]
     }
     provided = ["school", "degree"]
-    if field_of_study is not None:
-        provided.append("field_of_study")
-    if grade is not None:
-        provided.append("grade")
-    if start_year is not None:
-        provided.append("start_year")
-    if end_year is not None:
-        provided.append("end_year")
-    if description is not None:
-        provided.append("description")
+    if field_of_study is not None: provided.append("field_of_study")
+    if grade is not None: provided.append("grade")
+    if start_year is not None: provided.append("start_year")
+    if end_year is not None: provided.append("end_year")
+    if description is not None: provided.append("description")
+    if education_id is not None: provided.append("education_id")
     
     for arg in provided:
         if arg not in allowed_args.get(action, []):
             raise ToolError(f"Argument '{arg}' is not allowed for action '{action}'. Allowed arguments: {allowed_args.get(action, [])}")
 
-    if action != "add":
-        raise ToolError("Only 'add' action is currently supported for education.")
-        
     try:
         ctx = await get_ctx()
         async with ctx.lock:
             await ctx.initialize_browser()
-            result = await ctx.browser.upsert_education(
-                school=school,
-                degree=degree,
-                field_of_study=field_of_study,
-                grade=grade,
-                start_year=start_year,
-                end_year=end_year,
-                description=description,
-            )
+            
+            if action == "delete":
+                result = await ctx.browser.remove_education(school=school, degree=degree)
+            else:
+                result = await ctx.browser.upsert_education(
+                    school=school,
+                    degree=degree,
+                    field_of_study=field_of_study,
+                    grade=grade,
+                    start_year=start_year,
+                    end_year=end_year,
+                    description=description,
+                    education_id=education_id
+                )
+
             if result["status"] == "success":
                 return result["message"]
 
-            return f"ERROR: {result['message']}\nSUGGESTION: {result.get('suggestion', 'Verify mandatory fields.')}"
+            return f"ERROR: {result['message']}\nSUGGESTION: {result.get('suggestion', 'Check required fields.')}"
     except Exception as e:
         raise ToolError(f"Critical error managing education: {e}")

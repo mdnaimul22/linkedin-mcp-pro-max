@@ -87,24 +87,26 @@ class ApiExecutor:
         self._registry_path: Optional[str] = kwargs.get("registry_path")
 
     async def execute(self, url: str) -> DiscoveryResult:
-        """Navigate to a URL and return a structured map of all discovered input fields.
-
-        Args:
-            url: The target URL to analyze.
-
-        Returns:
-            DiscoveryResult with categorized fields and a summary.
-        """
+        """Navigate to a URL and return a structured map of all discovered input fields."""
         logger.info("Field Discovery Engine: navigating to %s", url)
-
         try:
             await self._page.goto(url, wait_until="domcontentloaded", timeout=60_000)
             await asyncio.sleep(_PAGE_LOAD_SETTLE_SECONDS)
+            return await self.discover(url)
+        except Exception as exc:
+            logger.error("Field discovery failed at %s: %s", url, exc)
+            return DiscoveryResult(url=url, success=False, error=str(exc))
 
+    async def discover(self, url: Optional[str] = None) -> DiscoveryResult:
+        """Analyze the current page and return a structured map of all discovered input fields."""
+        current_url = url or self._page.url
+        logger.info("Field Discovery Engine: analyzing current page %s", current_url)
+
+        try:
             html = await self._page.content()
             soup = BeautifulSoup(html, "lxml")
 
-            result = DiscoveryResult(url=url)
+            result = DiscoveryResult(url=current_url)
 
             for tag in soup.find_all(_DISCOVERABLE_TAGS):
                 field = _extract_field(tag, soup)
@@ -120,17 +122,8 @@ class ApiExecutor:
                         result.buttons.append(field)
 
             result.rebuild_summary()
-
-            logger.info(
-                "Discovery complete for %s — %d inputs, %d textareas, %d selects, %d buttons",
-                url,
-                result.summary.total_inputs,
-                result.summary.total_textareas,
-                result.summary.total_selects,
-                result.summary.total_buttons,
-            )
             return result
 
         except Exception as exc:
-            logger.error("Field discovery failed at %s: %s", url, exc)
-            return DiscoveryResult(url=url, success=False, error=str(exc))
+            logger.error("Field discovery failed: %s", exc)
+            return DiscoveryResult(url=current_url, success=False, error=str(exc))
