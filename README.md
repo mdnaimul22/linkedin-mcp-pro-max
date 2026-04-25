@@ -60,17 +60,16 @@ uv run python -m patchright install chromium
 cp .env.example .env
 ```
 
-### 3. Configuration
-
 Edit `.env` with your LinkedIn credentials:
 ```env
-LINKEDIN_USERNAME="your-email@example.com"
+LINKEDIN_EMAIL="your-email@example.com"
 LINKEDIN_PASSWORD="your-secure-password"
+LINKEDIN_USERNAME="your-profile-slug"
 ```
 
 ### 4. First-Run Authentication
 ```bash
-uv run linkedin-mcp-pro-max --login-auto
+uv run linkedin-mcp-pro-max --login
 ```
 
 ### 5. Connect to Claude Desktop (or any MCP client)
@@ -205,15 +204,12 @@ async def my_feature_tool(param: str) -> str:
 
 ---
 
-## CLI Reference
-
 ```bash
 uv run linkedin-mcp-pro-max             # Start MCP server
-uv run linkedin-mcp-pro-max --login-auto # Automated headless login
-uv run linkedin-mcp-pro-max --login      # Interactive browser login
-uv run linkedin-mcp-pro-max --status     # Check session status
-uv run linkedin-mcp-pro-max --logout     # Clear local session cache
-uv run ty check                          # Type-check the project
+uv run linkedin-mcp-pro-max --login     # Autonomous headless login
+uv run linkedin-mcp-pro-max --status    # Check authentication status
+uv run linkedin-mcp-pro-max --logout    # Clear session and cookies
+uv run ty check                         # Type-check the project
 ```
 
 ---
