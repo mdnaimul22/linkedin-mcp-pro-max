@@ -1,13 +1,3 @@
-"""Centralized storage for all prompts used across the LinkedIn MCP Server.
-
-This file serves as the Single Source of Truth for:
-1. MCP Tool Prompts (System Instructions for the AI interacting with the MCP)
-2. Internal AI Generation Prompts (System/User prompts for content generation)
-"""
-
-# ==========================================
-# 1. MCP Tool Prompts
-# ==========================================
 
 MCP_JOB_SEARCH_WORKFLOW = (
     "Help me find {role} jobs{loc}.\n\n"
@@ -37,9 +27,6 @@ MCP_PROFILE_OPTIMIZATION = (
     "3. Generate a polished resume to see how the profile looks in document form with generate_resume('me')"
 )
 
-# ==========================================
-# 2. Internal AI Generation Prompts
-# ==========================================
 
 CONTENT_GENERATION_SYSTEM_PROMPT = """You are a professional LinkedIn content strategist and writer.
 Your task is to write an engaging, authentic LinkedIn post.

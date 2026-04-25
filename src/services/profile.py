@@ -1,16 +1,9 @@
-"""Profile and company service with API and browser orchestration.
-
-Dependency Rule:
-  imports FROM: schema, api, browser, helpers, services/helpers
-  MUST NOT import: providers, tools
-"""
-
 import logging
 from typing import Optional
 
-from schema.profile import Profile, CompanyInfo
-from api.linkedin import LinkedInClient
-from browser.manager import BrowserManager
+from schema import Profile, CompanyInfo
+from providers.linkedin import LinkedInClient
+from browser.manager import Manager
 from config.settings import get_settings
 from helpers.exceptions import LinkedInMCPError
 from services.helpers.mapping import map_profile_browser
@@ -24,7 +17,7 @@ class ProfileService:
     def __init__(
         self,
         client: LinkedInClient,
-        browser: Optional[BrowserManager] = None,
+        browser: Optional[Manager] = None,
     ) -> None:
         self._client = client
         self._browser = browser
@@ -96,6 +89,12 @@ class ProfileService:
                     )
                     profile.education = browser_profile.education or profile.education
                     profile.summary = browser_profile.summary or profile.summary
+
+                    # Deduplicate only when a merge happened
+                    profile.experience = list(
+                        {(e.title, e.company, e.start_date, e.end_date): e for e in profile.experience}.values()
+                    )
+                    profile.skills = list(dict.fromkeys(profile.skills))
                 else:
                     profile = browser_profile
             except Exception as exc:
@@ -103,25 +102,6 @@ class ProfileService:
 
         if not profile:
             raise ValueError(f"Could not retrieve profile {target_id} from any source.")
-
-        # Deduplicate experiences
-        seen_exp: set[tuple[str, ...]] = set()
-        unique_exp = []
-        for e in profile.experience:
-            identifier = (e.title, e.company, e.start_date, e.end_date)
-            if identifier not in seen_exp:
-                seen_exp.add(identifier)
-                unique_exp.append(e)
-        profile.experience = unique_exp
-
-        # Deduplicate skills
-        seen_skills: set[str] = set()
-        unique_skills = []
-        for s in profile.skills:
-            if s not in seen_skills:
-                seen_skills.add(s)
-                unique_skills.append(s)
-        profile.skills = unique_skills
 
         return profile
 

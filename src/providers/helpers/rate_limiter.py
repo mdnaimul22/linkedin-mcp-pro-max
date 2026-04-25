@@ -1,9 +1,3 @@
-"""Simple async rate limiter using the token bucket algorithm.
-
-Local helper for the api/ module only.
-Rule: imports ONLY from standard library — no other project modules.
-"""
-
 import asyncio
 import time
 

@@ -1,8 +1,3 @@
-"""LinkedIn feed and content scraping logic.
-
-Handles parsing the home feed, post content, comments, and engagement metrics.
-"""
-
 import logging
 from typing import Any, Dict
 from patchright.async_api import Page

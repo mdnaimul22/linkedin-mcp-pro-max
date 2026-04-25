@@ -3,7 +3,6 @@ LinkedIn MCP Pro Max - CLI Entry Point
 This script handles configuration, authentication commands, and starts the server.
 """
 
-import os
 import logging
 import argparse
 import sys
@@ -112,7 +111,7 @@ Examples:
     # Start the MCP Server
     logger.info("Initializing LinkedIn MCP Pro Max Server...")
     
-    if hasattr(args, "dev") and args.dev:
+    if args.dev:
         try:
             from watchfiles import watch
             
@@ -121,7 +120,7 @@ Examples:
                 watcher_logger.info(f"Auto-reload enabled: Watching {src_dir} for changes...")
                 for changes in watch(src_dir):
                     watcher_logger.info(f"Detected changes: {changes}. Restarting server...")
-                    os._exit(0)
+                    sys.exit(0)
                     
             src_path = str(Path(__file__).parent.absolute())
             threading.Thread(target=run_watcher, args=(src_path,), daemon=True).start()

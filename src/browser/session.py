@@ -1,10 +1,3 @@
-"""Session manager — manages browser profiles, session state, and runtime identity.
-
-Dependency Rule:
-  imports FROM: standard library, config, schema, helpers(global)
-  MUST NOT import: api, browser, providers, services, tools
-"""
-
 import json
 import logging
 import platform
@@ -15,30 +8,21 @@ from uuid import uuid4
 
 from config.settings import Settings
 from helpers import secure_write_text, utcnow_iso
-from schema.session import RuntimeState, SourceState
+from schema import RuntimeState, SourceState
 
 logger = logging.getLogger("linkedin-mcp.session")
 
 
-class SessionManager:
-    """Manages LinkedIn browser sessions, authentication artifacts, and runtime identity."""
+class Session:
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._runtime_id = self._generate_runtime_id()
 
-    # ------------------------------------------------------------------
-    # Identity
-    # ------------------------------------------------------------------
-
     @property
     def runtime_id(self) -> str:
         """Unique identifier for this execution environment (OS + arch + container)."""
         return self._runtime_id
-
-    # ------------------------------------------------------------------
-    # Path resolution
-    # ------------------------------------------------------------------
 
     @property
     def auth_root(self) -> Path:
@@ -76,10 +60,6 @@ class SessionManager:
 
     def get_runtime_storage_state_path(self, runtime_id: str) -> Path:
         return self.get_runtime_dir(runtime_id) / "storage-state.json"
-
-    # ------------------------------------------------------------------
-    # State management
-    # ------------------------------------------------------------------
 
     def source_profile_exists(self) -> bool:
         """Return True if the source profile directory exists and is non-empty."""
@@ -150,10 +130,6 @@ class SessionManager:
         self._write_json(self.get_runtime_state_path(rid), state.model_dump())
         return state
 
-    # ------------------------------------------------------------------
-    # Cleanup
-    # ------------------------------------------------------------------
-
     def clear_runtime(self, runtime_id: str | None = None) -> bool:
         """Remove a specific runtime session directory."""
         rid = runtime_id or self.runtime_id
@@ -188,10 +164,6 @@ class SessionManager:
                 logger.error("Failed to clear %s: %s", target, exc)
                 success = False
         return success
-
-    # ------------------------------------------------------------------
-    # Private runtime-id generation
-    # ------------------------------------------------------------------
 
     def _generate_runtime_id(self) -> str:
         """Generate a deterministic environment fingerprint as runtime ID."""
@@ -232,10 +204,6 @@ class SessionManager:
             except Exception:
                 continue
         return False
-
-    # ------------------------------------------------------------------
-    # JSON I/O helpers (private)
-    # ------------------------------------------------------------------
 
     def _load_json(self, path: Path) -> dict[str, Any] | None:
         if not path.exists():

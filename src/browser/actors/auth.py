@@ -1,5 +1,3 @@
-"""LinkedIn authentication actors (login, validation, cookie management)."""
-
 import asyncio
 import json
 import logging

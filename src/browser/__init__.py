@@ -7,7 +7,7 @@ Dependency Rule:
 
 from .helpers.driver import BrowserDriver
 from .manager import (
-    BrowserManager,
+    Manager,
     create_browser,
 )
 from .helpers import (
@@ -26,7 +26,7 @@ from .actors.auth import (
 
 __all__ = [
     "BrowserDriver",
-    "BrowserManager",
+    "Manager",
     "create_browser",
     "validate_linkedin_auth",
     "export_linkedin_cookies",

@@ -1,10 +1,3 @@
-"""Local job application tracking service.
-
-Dependency Rule:
-  imports FROM: standard library, schema, helpers(global)
-  MUST NOT import: api, browser, session, providers, tools
-"""
-
 import asyncio
 import json
 import logging
@@ -14,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from schema.tracker import StatusType, TrackedApplication
+from schema import StatusType, TrackedApplication
 from helpers import sanitize_filename
 
 logger = logging.getLogger("linkedin-mcp.services.tracker")

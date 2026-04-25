@@ -1,8 +1,3 @@
-"""Configuration management for LinkedIn MCP server.
-
-Loads settings from .env file and environment variables using Pydantic Settings.
-"""
-
 import logging
 from pathlib import Path
 from typing import Literal

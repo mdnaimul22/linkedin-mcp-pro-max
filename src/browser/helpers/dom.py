@@ -1,5 +1,3 @@
-"""Browser DOM manipulation helpers — private utilities for the browser/ module only."""
-
 import asyncio
 from typing import Literal
 from patchright.async_api import Page, TimeoutError as PlaywrightTimeoutError

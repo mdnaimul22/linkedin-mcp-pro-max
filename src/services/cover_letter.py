@@ -1,10 +1,3 @@
-"""Cover letter generation service with AI and template rendering.
-
-Dependency Rule:
-  imports FROM: schema, providers, services/jobs, services/profile, services/template, services/helpers
-  MUST NOT import: api (directly), browser, session, tools
-"""
-
 import asyncio
 import json
 import logging
@@ -15,7 +8,7 @@ from typing import Any
 
 
 from providers.base import BaseProvider
-from schema.document import CoverLetterContent, GeneratedDocument
+from schema import CoverLetterContent, GeneratedDocument
 from services.helpers import convert_html_to_markdown, convert_html_to_pdf
 from services.jobs import JobSearchService
 from services.profile import ProfileService

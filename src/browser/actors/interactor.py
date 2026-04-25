@@ -1,8 +1,3 @@
-"""LinkedIn engagement and interaction logic.
-
-Handles automated actions like liking and commenting on content.
-"""
-
 import asyncio
 import logging
 from typing import Dict, Any

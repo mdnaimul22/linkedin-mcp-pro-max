@@ -1,10 +1,3 @@
-"""Playwright trace capture helper — private to browser/ module only.
-
-Dependency Rule:
-  imports FROM: standard library, config, helpers (global)
-  MUST NOT import: api, session, providers, services, tools
-"""
-
 from __future__ import annotations
 
 import itertools

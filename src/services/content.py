@@ -1,9 +1,3 @@
-"""Service for handling content, feed interactions, and AI-powered post creation.
-
-Dependency Rule:
-    imports FROM: browser, providers, config.prompts, helpers, services/helpers
-    MUST NOT import: tools, app
-"""
 from __future__ import annotations
 
 import logging
@@ -11,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from browser.manager import BrowserManager
+from browser.manager import Manager
 from helpers.exceptions import LinkedInMCPError
 from providers.base import BaseProvider
 from providers.image import ImageProvider
@@ -50,7 +44,7 @@ class ContentService:
 
     def __init__(
         self,
-        browser: BrowserManager | None = None,
+        browser: Manager | None = None,
         ai: BaseProvider | None = None,
         image_provider: ImageProvider | None = None,
     ) -> None:

@@ -1,12 +1,3 @@
-"""Document format conversion utilities.
-
-Private helper for the services/ module only.
-
-Dependency Rule:
-  imports FROM: standard library only
-  MUST NOT import: any project module
-"""
-
 import logging
 import re
 from pathlib import Path

@@ -1,10 +1,3 @@
-"""
-OpenAI API interface for LLMs
-
-This module also supports a "manual mode" (human-in-the-loop) where prompts are written
-to a task queue directory and the system waits for a corresponding *.answer.json file
-"""
-
 import asyncio
 import json
 import logging

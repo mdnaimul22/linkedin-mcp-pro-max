@@ -1,20 +1,9 @@
-"""Single LinkedIn API client — the sole point of contact with the linkedin-api library.
-
-Dependency Rule:
-  imports FROM: config, schema, exceptions, api/helpers
-  imports NOTHING FROM: browser, session, providers, services, tools
-
-All synchronous linkedin-api calls are wrapped in asyncio.to_thread() for a consistent
-async interface.
-"""
-
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
 from typing import Any, Optional, TYPE_CHECKING
-from datetime import datetime, timezone
 from pathlib import Path
 
 from config.settings import Settings
@@ -34,14 +23,13 @@ from schema import (
     Language,
     Profile,
 )
-from api.helpers import AsyncRateLimiter
+from schema.models import _format_date_obj, _format_timestamp
+from providers.helpers import AsyncRateLimiter
 
 if TYPE_CHECKING:
     from browser.helpers.sniffer import NetworkSniffer
 
 logger = logging.getLogger("linkedin-mcp.api")
-
-# --- Filter value mappings -----------------------------------------------
 
 JOB_TYPE_MAP: dict[str, str] = {
     "FULL_TIME": "F",
@@ -70,16 +58,10 @@ DATE_POSTED_MAP: dict[str, int] = {
 
 
 def _cookies_path(settings: Settings) -> Path:
-    """Return the portable cookies path derived from the user_data_dir."""
     return settings.user_data_dir.parent / "cookies.json"
 
 
 class LinkedInClient:
-    """Async wrapper around the linkedin-api library.
-
-    This is the ONLY class in the project that may import or call linkedin-api.
-    """
-
     def __init__(
         self, settings: Settings, sniffer: Optional[NetworkSniffer] = None
     ) -> None:
@@ -91,8 +73,7 @@ class LinkedInClient:
         self._rate_limiter = AsyncRateLimiter(calls_per_minute=30)
 
     def _load_cookies_from_json(self) -> Any:
-        """Load Playwright-formatted cookies from JSON and convert to RequestsCookieJar."""
-        from requests.cookies import RequestsCookieJar  # noqa: PLC0415
+        from requests.cookies import RequestsCookieJar
 
         path = _cookies_path(self._settings)
         if not path.exists():
@@ -115,12 +96,7 @@ class LinkedInClient:
             logger.warning("Failed to load cookies from %s: %s", path, exc)
             return None
 
-    # ------------------------------------------------------------------
-    # Authentication
-    # ------------------------------------------------------------------
-
     async def ensure_authenticated(self) -> None:
-        """Authenticate with LinkedIn. Idempotent — safe to call multiple times."""
         if self._authenticated and self._api is not None:
             return
         async with self._auth_lock:
@@ -129,7 +105,6 @@ class LinkedInClient:
             await self._do_login()
 
     async def _do_login(self) -> None:
-        """Perform the actual linkedin-api login. Must be called under _auth_lock."""
 
         def _login() -> Any:
             try:
@@ -147,13 +122,10 @@ class LinkedInClient:
                         refresh_cookies=False,
                     )
 
-                    # Force overwrite the library's internal session cookies with our Playwright ones
                     api.client.session.cookies.update(cookies)
 
-                    # Attach unified logging hook if sniffer is present
                     self._setup_session_logging(api.client.session)
 
-                    # Sync the CSRF token which the library expects
                     if "JSESSIONID" in api.client.session.cookies:
                         api.client.session.headers["csrf-token"] = (
                             api.client.session.cookies["JSESSIONID"].strip('"')
@@ -161,7 +133,6 @@ class LinkedInClient:
 
                     return api
 
-                # Fallback to normal login
                 api = Linkedin(
                     self._settings.linkedin_username,
                     self._settings.linkedin_password.get_secret_value(),
@@ -231,10 +202,6 @@ class LinkedInClient:
             return response
 
         session.hooks["response"].append(response_hook)
-
-    # ------------------------------------------------------------------
-    # Public API methods
-    # ------------------------------------------------------------------
 
     async def search_jobs(
         self,
@@ -334,12 +301,23 @@ class LinkedInClient:
                 )
                 return {}
 
-        # Sequential calls — linkedin-api's Session is not thread-safe.
-        # We wrap in a block to catch KeyError which the library raises on API errors (e.g. 404).
+
+        def _fetch_all() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
+            p = self._api.get_profile(profile_id)
+            s: list[dict[str, Any]] = []
+            c: dict[str, Any] = {}
+            try:
+                s = self._api.get_profile_skills(profile_id)
+            except Exception as exc:
+                logger.warning("Failed to fetch skills for %s: %s", profile_id, exc)
+            try:
+                c = self._api.get_profile_contact_info(profile_id)
+            except Exception as exc:
+                logger.warning("Failed to fetch contact info for %s: %s", profile_id, exc)
+            return p, s, c
+
         try:
-            profile_data = await asyncio.to_thread(_get_profile)
-            skills_data = await asyncio.to_thread(_get_skills)
-            contact_data = await asyncio.to_thread(_get_contact)
+            profile_data, skills_data, contact_data = await asyncio.to_thread(_fetch_all)
         except KeyError as exc:
             # The library raises KeyError: 'profile' if it gets an error response from LinkedIn
             raise LinkedInAPIError(
@@ -386,10 +364,6 @@ class LinkedInClient:
 
         return self._format_company(company_id, company_data)
 
-    # ------------------------------------------------------------------
-    # Private formatters (inline — cannot delegate to services/ due to
-    # dependency rule: api (L2) must not import services (L3)).
-    # ------------------------------------------------------------------
 
     def _format_job_listing(self, job: dict[str, Any]) -> JobListing:
         entity_urn = job.get("entityUrn", "")
@@ -413,7 +387,7 @@ class LinkedInClient:
             company=company or "Unknown",
             location=job.get("formattedLocation", job.get("location", "Not specified")),
             url=f"https://www.linkedin.com/jobs/view/{job_id}",
-            date_posted=self._format_timestamp(job.get("listedAt", "")),
+            date_posted=_format_timestamp(job.get("listedAt", "")),
             applicant_count=job.get("applicantCount"),
         )
 
@@ -444,7 +418,7 @@ class LinkedInClient:
             skills=skills,
             industries=job.get("industries", []),
             job_functions=job.get("jobFunctions", []),
-            date_posted=self._format_timestamp(job.get("listedAt", "")),
+            date_posted=_format_timestamp(job.get("listedAt", "")),
             applicant_count=job.get("applicantCount"),
         )
 
@@ -460,11 +434,11 @@ class LinkedInClient:
                 title=exp.get("title", ""),
                 company=exp.get("companyName", ""),
                 location=exp.get("locationName", ""),
-                start_date=self._format_date(
+                start_date=_format_date_obj(
                     exp.get("timePeriod", {}).get("startDate")
                 ),
                 end_date=(
-                    self._format_date(exp.get("timePeriod", {}).get("endDate"))
+                    _format_date_obj(exp.get("timePeriod", {}).get("endDate"))
                     if exp.get("timePeriod", {}).get("endDate")
                     else "Present"
                 ),
@@ -478,10 +452,10 @@ class LinkedInClient:
                 school=edu.get("schoolName", ""),
                 degree=edu.get("degreeName", ""),
                 field_of_study=edu.get("fieldOfStudy", ""),
-                start_date=self._format_date(
+                start_date=_format_date_obj(
                     edu.get("timePeriod", {}).get("startDate")
                 ),
-                end_date=self._format_date(edu.get("timePeriod", {}).get("endDate")),
+                end_date=_format_date_obj(edu.get("timePeriod", {}).get("endDate")),
             )
             for edu in data.get("education", [])
         ]
@@ -544,37 +518,3 @@ class LinkedInClient:
             specialties=data.get("specialities", data.get("specialties", [])),
             url=f"https://www.linkedin.com/company/{company_id}",
         )
-
-    @staticmethod
-    def _format_timestamp(value: Any) -> str:
-        """Convert LinkedIn millisecond timestamp to ISO date string."""
-        if isinstance(value, (int, float)) and value > 0:
-            return datetime.fromtimestamp(value / 1000, tz=timezone.utc).strftime(
-                "%Y-%m-%d"
-            )
-        return str(value) if value else ""
-
-    @staticmethod
-    def _format_date(date_obj: dict[str, Any] | None) -> str:
-        if not date_obj:
-            return ""
-        month = date_obj.get("month", 0)
-        year = date_obj.get("year", 0)
-        if month and year:
-            months = [
-                "",
-                "Jan",
-                "Feb",
-                "Mar",
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-            ]
-            return f"{months[min(month, 12)]} {year}"
-        return str(year) if year else ""

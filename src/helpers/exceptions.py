@@ -1,12 +1,4 @@
-"""Global custom exceptions for LinkedIn MCP server.
-
-This module is the single source of truth for all custom error classes.
-It intentionally has ZERO local project imports — only standard library types.
-Every other module (api, browser, session, providers, services, tools) imports from here.
-"""
-
 from typing import Any
-
 
 class LinkedInMCPError(Exception):
     """Base class for all exceptions in the LinkedIn MCP server."""

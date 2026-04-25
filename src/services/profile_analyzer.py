@@ -1,10 +1,3 @@
-"""Profile analysis service using AI provider.
-
-Dependency Rule:
-    imports FROM: providers, json
-    MUST NOT import: api, browser, session, tools
-"""
-
 import json
 import logging
 from typing import Any

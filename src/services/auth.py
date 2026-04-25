@@ -1,22 +1,15 @@
-"""LinkedIn authentication resolver and interactive login flow.
-
-Dependency Rule:
-  imports FROM: browser, session, exceptions
-  MUST NOT import: api, providers, tools
-"""
-
 from __future__ import annotations
 
 import asyncio
 import logging
 
 from browser import (
-    BrowserManager,
+    Manager,
     validate_linkedin_auth,
     handle_login_form,
     stabilize_navigation,
 )
-from browser.session import SessionManager
+from browser.session import Session
 
 logger = logging.getLogger("linkedin-mcp.services.auth")
 
@@ -25,7 +18,7 @@ class AuthResolver:
     """Resolver for LinkedIn authentication barriers and login orchestration."""
 
     def __init__(
-        self, browser: BrowserManager, session_manager: SessionManager
+        self, browser: Manager, session_manager: Session
     ) -> None:
         self.browser = browser
         self.sessions = session_manager

@@ -1,5 +1,3 @@
-"""LinkedIn profile scraping logic (extracting experience, education, skills)."""
-
 import logging
 from typing import Any
 from patchright.async_api import Page, Locator
@@ -18,7 +16,9 @@ class ProfileScraper:
     async def scrape(self, profile_id: str) -> dict[str, Any]:
         """Navigate to and scrape a profile by its ID (slug)."""
         profile_url = f"https://www.linkedin.com/in/{profile_id}/"
-        logger.info("Scraping profile: %s", profile_url)
+
+
+        logger.info("Scraping profile via UI: %s", profile_url)
 
         await self.page.goto(profile_url, wait_until="load")
         await stabilize_navigation(self.page)
@@ -119,6 +119,8 @@ class ProfileScraper:
         except Exception as exc:
             logger.debug("Experience scraping minor error: %s", exc)
         return experiences
+
+
 
     async def _parse_experience_item(self, item: Locator) -> dict[str, Any] | None:
         """Helper to parse a single experience list item."""

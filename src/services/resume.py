@@ -1,10 +1,3 @@
-"""Resume generation service with AI enhancement and template rendering.
-
-Dependency Rule:
-  imports FROM: schema, providers, services/jobs, services/profile, services/template, services/helpers
-  MUST NOT import: api (directly), browser, session, tools
-"""
-
 import asyncio
 import json
 import logging
@@ -15,7 +8,7 @@ from typing import Any
 
 
 from providers.base import BaseProvider
-from schema.document import (
+from schema import (
     GeneratedDocument,
     ResumeContent,
     ResumeEducation,

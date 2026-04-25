@@ -1,10 +1,3 @@
-"""Jinja2 template manager for resume and cover letter rendering.
-
-Dependency Rule:
-  imports FROM: standard library, config, exceptions
-  MUST NOT import: api, browser, session, providers, tools
-"""
-
 import logging
 from pathlib import Path
 from typing import Any

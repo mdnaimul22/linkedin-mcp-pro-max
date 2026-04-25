@@ -1,17 +1,3 @@
-"""Manages the LinkedIn browser session lifecycle and delegates tasks to scrapers/actors.
-
-Architecture Note
------------------
-Actors and Scrapers are auto-discovered via `helpers.registry` and instantiated
-in `start()`. No manual imports or field declarations are needed when adding new
-actors or scrapers — simply place a file in `browser/actors/` or `browser/scrapers/`
-and add a convention marker at the bottom.
-
-Access pattern:
-    manager.profile_editor.update_headline(...)   # actor
-    manager.profile_scraper.scrape(...)            # scraper
-"""
-
 from __future__ import annotations
 import logging
 import json
@@ -20,25 +6,16 @@ from pathlib import Path
 from typing import Any
 
 from patchright.async_api import BrowserContext, Page, ViewportSize
-
 from browser.helpers.driver import BrowserDriver
-from browser.helpers.sniffer import NetworkSniffer
 from browser.helpers import stabilize_navigation
 from browser.actors.auth import validate_linkedin_auth, export_linkedin_cookies
 from helpers.exceptions import AuthenticationError
-from schema.session import SourceState
+from schema import SourceState
 
 logger = logging.getLogger("linkedin-mcp.browser.manager")
 
 
-class BrowserManager:
-    """Orchestrator for LinkedIn browser automation.
-
-    Actors and scrapers are registered automatically via the component registry.
-    Access them as named attributes:
-        self.browser.profile_editor.update_headline(...)
-        self.browser.profile_scraper.scrape(...)
-    """
+class Manager:
 
     def __init__(self, session_manager: Any, driver: BrowserDriver) -> None:
         self.sessions = session_manager
@@ -46,38 +23,33 @@ class BrowserManager:
         self._context: BrowserContext | None = None
         self._page: Page | None = None
         self.is_authenticated: bool = False
-        self.sniffer = NetworkSniffer()
-
-        # Dynamic actor/scraper registries (populated in start())
         self._actors: dict[str, Any] = {}
         self._scrapers: dict[str, Any] = {}
+        self._actor_classes: dict[str, type] = {}
+        self._scraper_classes: dict[str, type] = {}
+        self._cached_profile_id: str | None = None
+        self.api_executor: Any = None
 
     async def start(self) -> None:
-        """Initialize browser context, then auto-register all actors and scrapers."""
         if self._context:
             return
         self._context = await self.driver.start()
-        self._context.on("request", self.sniffer.on_request)
-        self._context.on("response", self.sniffer.on_response)
         self._page = (
             self._context.pages[0]
             if self._context.pages
             else await self._context.new_page()
         )
 
-        # Auto-instantiate all registered actors and scrapers
         from helpers.registry import get_actors, get_scrapers
         for meta in get_actors():
-            self._actors[meta.attr] = meta.cls(self._page)
-            logger.debug("Loaded actor: %s", meta.attr)
+            self._actor_classes[meta.attr] = meta.cls
         for meta in get_scrapers():
-            self._scrapers[meta.attr] = meta.cls(self._page)
-            logger.debug("Loaded scraper: %s", meta.attr)
+            self._scraper_classes[meta.attr] = meta.cls
 
         logger.info(
-            "Browser manager ready — %d actor(s), %d scraper(s).",
-            len(self._actors),
-            len(self._scrapers),
+            "Browser manager ready — %d actor(s), %d scraper(s) registered for lazy-loading.",
+            len(self._actor_classes),
+            len(self._scraper_classes),
         )
 
     async def close(self) -> None:
@@ -86,6 +58,7 @@ class BrowserManager:
         self._context = None
         self._actors.clear()
         self._scrapers.clear()
+        self._cached_profile_id = None
         await self.driver.stop()
 
     @property
@@ -100,70 +73,104 @@ class BrowserManager:
             raise RuntimeError("Browser context not initialized.")
         return self._context
 
-    def toggle_sniffing(self, enabled: bool) -> None:
-        self.sniffer.enable(enabled)
+
+    def set_api_executor(self, executor: Any) -> None:
+        """Inject ApiExecutor into all registered scrapers.
+
+        This is the single public entry-point for wiring the API executor.
+        app.py must call this instead of directly looping over self._scrapers.
+        """
+        self.api_executor = executor
+        # Update any already instantiated scrapers
+        for scraper in self._scrapers.values():
+            if hasattr(scraper, "api_executor"):
+                scraper.api_executor = executor
+        logger.debug("ApiExecutor ready to be wired into scrapers.")
 
     def __getattr__(self, name: str) -> Any:
-        """
-        Proxy attribute access to registered actors and scrapers.
-
-        This enables direct access like:
-            manager.profile_editor.update_headline(...)
-            manager.profile_scraper.scrape(...)
-        """
-        # Avoid infinite recursion on internal dunder attributes
         if name.startswith("_"):
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
         actors = object.__getattribute__(self, "_actors")
         scrapers = object.__getattribute__(self, "_scrapers")
+        actor_classes = object.__getattribute__(self, "_actor_classes")
+        scraper_classes = object.__getattribute__(self, "_scraper_classes")
+        page = object.__getattribute__(self, "_page")
 
         if name in actors:
             return actors[name]
         if name in scrapers:
             return scrapers[name]
+
+        if name in actor_classes:
+            if not page:
+                raise RuntimeError(f"Cannot instantiate actor '{name}' before browser start.")
+            actor = actor_classes[name](page)
+            actors[name] = actor
+            logger.debug("Lazy-loaded actor: %s", name)
+            return actor
+
+        if name in scraper_classes:
+            if not page:
+                raise RuntimeError(f"Cannot instantiate scraper '{name}' before browser start.")
+            scraper = scraper_classes[name](page)
+            
+            # Inject api_executor if available
+            api_executor = object.__getattribute__(self, "api_executor")
+            if api_executor and hasattr(scraper, "api_executor"):
+                scraper.api_executor = api_executor
+                
+            scrapers[name] = scraper
+            logger.debug("Lazy-loaded scraper: %s", name)
+            return scraper
+
         raise AttributeError(
             f"'{type(self).__name__}' has no attribute '{name}'. "
-            f"Available actors: {list(actors)}. "
-            f"Available scrapers: {list(scrapers)}."
+            f"Available actors: {list(actor_classes)}. "
+            f"Available scrapers: {list(scraper_classes)}."
         )
 
-    # ── Auth & Session Helpers ──────────────────────────────────────────────
-
     async def get_current_profile_id(self) -> str:
-        """Resolve current UID from multiple strategies."""
+        """Resolve the authenticated user's LinkedIn profile slug.
+
+        Result is cached in-session — the /me navigation only runs once per session.
+        """
+        if self._cached_profile_id:
+            return self._cached_profile_id
+
         logger.info("Resolving current profile ID...")
-        selectors = [
-            "a.global-nav__primary-link[href*='/in/']",
-            ".identity-block__link",
-            ".feed-identity-module__actor-link",
-            "a[href*='/in/']",
-        ]
 
-        for selector in selectors:
-            count = await self.page.locator(selector).count()
-            for i in range(count):
-                link = self.page.locator(selector).nth(i)
-                href = await link.get_attribute("href")
-                if href and "/in/" in href:
-                    match = re.search(r"/in/([^/?#]+)", href)
-                    if match and match.group(1) not in [
-                        "search", "settings", "me", "discover",
-                    ]:
-                        return match.group(1)
+        if self.sessions.settings.linkedin_username:
+            logger.debug("Using profile ID from settings: %s", self.sessions.settings.linkedin_username)
+            self._cached_profile_id = self.sessions.settings.linkedin_username
+            return self._cached_profile_id
 
-        if "linkedin.com/feed" not in self.page.url:
-            await self.page.goto(
-                "https://www.linkedin.com/feed/", wait_until="domcontentloaded"
-            )
-            await stabilize_navigation(self.page)
+        try:
+            logger.debug("Resolving via /me redirect on a dedicated page...")
+            temp_page = await self.page.context.new_page()
+            await temp_page.goto("https://www.linkedin.com/me", wait_until="commit", timeout=30000)
+            
+            try:
+                await temp_page.wait_for_url("**/in/**", timeout=15000)
+            except Exception:
+                logger.debug("URL after /me navigation: %s", temp_page.url)
 
-        await self.page.goto("https://www.linkedin.com/me", wait_until="load")
-        match = re.search(r"linkedin\.com/in/([^/?#]+)", self.page.url)
-        if match:
-            return match.group(1)
+            match = re.search(r"linkedin\.com/in/([^/?#]+)", temp_page.url)
+            await temp_page.close()
+            
+            if match:
+                slug = match.group(1)
+                logger.info("Resolved current profile ID: %s", slug)
+                self._cached_profile_id = slug
+                return slug
+        except Exception as e:
+            logger.warning(f"Failed to resolve profile via /me redirect: {e}")
+            try:
+                await temp_page.close()
+            except Exception:
+                pass
 
-        raise AuthenticationError("Could not resolve profile ID")
+        raise AuthenticationError("Could not resolve profile ID and no LINKEDIN_USERNAME in settings.")
 
     async def export_cookies(self, path: Path | None = None) -> bool:
         target = path or self.sessions.portable_cookies_path
@@ -179,11 +186,6 @@ class BrowserManager:
             return True
         except Exception:
             return False
-
-    # ── Convenience Proxies (backwards-compatible) ──────────────────────────
-    # These thin wrappers preserve the existing public API for services
-    # that call browser methods directly. New code should access actors/scrapers
-    # directly via manager.<actor_attr>.<method>(...)
 
     async def scrape_profile_by_id(self, profile_id: str) -> dict[str, Any]:
         """Scrape raw profile data. Mapping is caller's responsibility."""
@@ -214,6 +216,14 @@ class BrowserManager:
         pid = await self.get_current_profile_id()
         return await self.profile_editor.manage_skills(pid, skill_name, action)
 
+    async def upsert_education(self, **kwargs: Any) -> dict[str, Any]:
+        pid = await self.get_current_profile_id()
+        return await self.profile_editor.upsert_education(profile_id=pid, **kwargs)
+
+    async def update_cover_image(self, image_path: str) -> dict[str, Any]:
+        pid = await self.get_current_profile_id()
+        return await self.profile_editor.update_cover_image(pid, image_path)
+
     async def read_post(self, post_url: str) -> dict[str, Any]:
         await self.page.goto(post_url, wait_until="domcontentloaded")
         await stabilize_navigation(self.page)
@@ -233,9 +243,6 @@ class BrowserManager:
         return await self.content_interactor.create_post(text)
 
 
-# ── Factory ────────────────────────────────────────────────────────────────────
-
-
 async def create_browser(
     session_manager: Any,
     headless: bool = True,
@@ -244,14 +251,10 @@ async def create_browser(
     viewport_height: int = 720,
     slow_mo: int = 0,
     **launch_options: Any,
-) -> BrowserManager:
-    """Create and return a fully initialized BrowserManager instance.
-
-    Caching/singleton logic is the caller's responsibility (see AppContext).
-    """
+) -> Manager:
+    
     viewport = ViewportSize(width=viewport_width, height=viewport_height)
 
-    # CASE 1: CDP connection
     if cdp_url:
         driver = BrowserDriver(
             user_data_dir=session_manager.source_profile_dir,
@@ -260,7 +263,7 @@ async def create_browser(
             slow_mo=slow_mo,
             **launch_options,
         )
-        mgr = BrowserManager(session_manager, driver)
+        mgr = Manager(session_manager, driver)
         await mgr.start()
         mgr.is_authenticated = True
         return mgr
@@ -268,7 +271,6 @@ async def create_browser(
     source_state = session_manager.load_source_state()
     rid = session_manager.runtime_id
 
-    # CASE 2: No prior login state
     if not source_state or not session_manager.source_profile_exists():
         driver = BrowserDriver(
             user_data_dir=session_manager.source_profile_dir,
@@ -277,11 +279,10 @@ async def create_browser(
             slow_mo=slow_mo,
             **launch_options,
         )
-        mgr = BrowserManager(session_manager, driver)
+        mgr = Manager(session_manager, driver)
         await mgr.start()
         return mgr
 
-    # CASE 3: Same environment as source
     if rid == source_state.source_runtime_id:
         driver = BrowserDriver(
             user_data_dir=session_manager.source_profile_dir,
@@ -290,13 +291,12 @@ async def create_browser(
             slow_mo=slow_mo,
             **launch_options,
         )
-        mgr = BrowserManager(session_manager, driver)
+        mgr = Manager(session_manager, driver)
         await mgr.start()
         if await validate_linkedin_auth(mgr.page):
             mgr.is_authenticated = True
         return mgr
 
-    # CASE 4: Different environment with valid bridged session
     runtime_state = session_manager.load_runtime_state(rid)
     if (
         runtime_state
@@ -310,13 +310,12 @@ async def create_browser(
             slow_mo=slow_mo,
             **launch_options,
         )
-        mgr = BrowserManager(session_manager, driver)
+        mgr = Manager(session_manager, driver)
         await mgr.start()
         if await validate_linkedin_auth(mgr.page):
             mgr.is_authenticated = True
             return mgr
 
-    # CASE 5: Build new bridged session
     driver = await _bridge_linkedin_session(
         sessions=session_manager,
         source_state=source_state,
@@ -325,7 +324,7 @@ async def create_browser(
         slow_mo=slow_mo,
         **launch_options,
     )
-    mgr = BrowserManager(session_manager, driver)
+    mgr = Manager(session_manager, driver)
     await mgr.start()
     mgr.is_authenticated = True
     return mgr

@@ -1,8 +1,4 @@
 """
-LinkedIn MCP Pro Max — Composition Root
-========================================
-Instantiates and connects all application layers via the Unified Component Registry.
-
 Architecture
 ------------
 All services are auto-discovered from `services/` and wired into AppContext at
@@ -19,68 +15,45 @@ Lifecycle
 from __future__ import annotations
 
 import logging
+import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator
 
 from fastmcp import FastMCP
 
 from config.settings import Settings, get_settings
-from api.linkedin import LinkedInClient
-from browser.manager import BrowserManager, create_browser
-from browser.session import SessionManager
+from providers.linkedin import LinkedInClient
+from browser.manager import Manager, create_browser
+from browser.session import Session
 from providers import BaseProvider, ClaudeProvider, OpenAIProvider
 from providers.image import ImageProvider
-from api.executor import ApiExecutor
+from browser.helpers.executor import ApiExecutor
 from services.helpers import JSONCache
+from helpers.registry import discover_all, get_services
 
-# Type-only imports for IDE support (no runtime cost)
 if TYPE_CHECKING:
-    from services.profile import ProfileService
-    from services.jobs import JobSearchService
-    from services.tracker import ApplicationTrackerService
-    from services.resume import ResumeGeneratorService
-    from services.cover_letter import CoverLetterGeneratorService
-    from services.content import ContentService
-    from services.profile_analyzer import ProfileAnalyzerService
-    from services.template import TemplateManager
+    pass
 
 logger = logging.getLogger("linkedin-mcp-pro-max.app")
 
 
 @dataclass
 class AppContext:
-    """
-    Central Dependency Injection (DI) container.
-
-    All services are wired automatically via the registry — no manual
-    field declarations needed for new services. Infrastructure components
-    (browser, AI provider) are managed explicitly as they have
-    complex lifecycle requirements.
-
-    Service access:
-        ctx = await get_ctx()
-        profiles = ctx.profiles          # auto-wired ProfileService
-        resume_gen = ctx.resume_gen      # auto-wired ResumeGeneratorService
-    """
 
     settings: Settings
-    sessions: SessionManager
+    sessions: Session
     client: LinkedInClient
+    lock: asyncio.Lock = field(init=False)
     cache: JSONCache = field(init=False)
     ai: BaseProvider | None = field(init=False)
     image_provider: ImageProvider | None = field(init=False)
-
-    # Infrastructure components (managed explicitly)
-    browser: BrowserManager | None = field(default=None)
+    browser: Manager | None = field(default=None)
     api_executor: ApiExecutor | None = field(default=None)
 
     def __post_init__(self) -> None:
-        """Bootstrap the AI provider and auto-wire all eager services."""
-
-        # ── Core Infrastructure ────────────────────────────────────────────
+        self.lock = asyncio.Lock()
         self.cache = JSONCache(self.settings.data_dir / "cache")
 
-        # ── AI Provider ────────────────────────────────────────────────────
         provider_type = self.settings.ai_provider.lower()
         if provider_type == "openai" and self.settings.openai_api_key:
             self.ai = OpenAIProvider(
@@ -96,7 +69,6 @@ class AppContext:
         else:
             self.ai = None
 
-        # ── Image Generation Provider (Google Gemini) ─────────────────────────
         if self.settings.has_image_gen:
             self.image_provider = ImageProvider(
                 api_key=self.settings.gemini_api_key,
@@ -105,8 +77,6 @@ class AppContext:
         else:
             self.image_provider = None
 
-        # ── Auto-Wire Eager Services ───────────────────────────────────────
-        # The registry scans services/ and instantiates all non-lazy services.
         self._wire_services(lazy=False)
 
     def _wire_services(self, lazy: bool) -> None:
@@ -122,7 +92,7 @@ class AppContext:
             lazy: If True, wire only lazy (browser-dependent) services.
                   If False, wire only eager (startup-time) services.
         """
-        from helpers.registry import get_services
+        
 
         pending = [m for m in get_services() if m.lazy == lazy]
         max_passes = len(pending) + 1  # guaranteed to converge
@@ -144,15 +114,13 @@ class AppContext:
             if not still_pending:
                 break  # all wired
             if len(still_pending) == len(pending):
-                # No progress — log remaining failures and stop
-                for meta, exc in still_pending:
-                    logger.error(
-                        "Failed to wire service '%s' (%s): %s",
-                        meta.attr,
-                        meta.cls.__name__,
-                        exc,
-                    )
-                break
+                # No progress — circular dependency detected, fail fast
+                failed = [(m.attr, m.cls.__name__, str(exc)) for m, exc in still_pending]
+                details = "; ".join(f"{attr} ({cls}): {err}" for attr, cls, err in failed)
+                raise RuntimeError(
+                    f"Circular or unresolvable service dependency detected — "
+                    f"no progress after pass {pass_num}. Failed services: {details}"
+                )
             pending = [m for m, _ in still_pending]
 
     async def initialize_browser(self) -> None:
@@ -174,64 +142,53 @@ class AppContext:
             slow_mo=self.settings.slow_mo,
         )
 
-        # Wire lazy services now that browser is available
         self._wire_services(lazy=True)
 
-        # Attach sniffer to API client for cross-layer network logging
         self.api_executor = ApiExecutor(
             page=self.browser.page,
             registry_path=self.settings.data_dir / "api_cookbook.json",
         )
-        if self.browser.sniffer:
-            self.client.sniffer = self.browser.sniffer
+        self.browser.set_api_executor(self.api_executor)
 
-        logger.info("Browser initialized and lazy services wired.")
-
-
-# ── Global Singleton ───────────────────────────────────────────────────────────
+        logger.info("Browser initialized — ready for field discovery.")
 
 _context: AppContext | None = None
-
 
 async def get_ctx() -> AppContext:
     """Retrieve or lazily initialize the global AppContext singleton."""
     global _context
     if not _context:
         settings = get_settings()
-        sessions = SessionManager(settings)
+        sessions = Session(settings)
         client = LinkedInClient(settings)
         _context = AppContext(settings, sessions, client)
     return _context
 
 
-# ── MCP Server ────────────────────────────────────────────────────────────────
-
 mcp = FastMCP("LinkedIn MCP Pro Max")
 
-# ── Bootstrap: Run discovery and register all components ──────────────────────
-# Order matters:
-#   1. discover_all() populates the service/actor/scraper registries.
-#   2. `import tools` triggers tool autodiscovery (tools/__init__.py).
-from helpers.registry import discover_all  # noqa: E402
 discover_all()
-
-import tools  # noqa: E402, F401  — triggers tools/__init__.py discovery
-
-
-# ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @mcp.lifespan()
 async def app_lifespan(server: FastMCP) -> AsyncIterator[None]:
-    """Manage MCP server startup and graceful shutdown."""
+    """Manage MCP server startup and graceful shutdown.
+
+    Startup: initialize browser + bind sniffer + start DiscoveryPipeline.
+    Shutdown: stop pipeline + close browser gracefully.
+    """
+    ctx = await get_ctx()
+
+    try:
+        await ctx.initialize_browser()
+        logger.info("Lifespan: browser ready — DiscoveryPipeline running in background.")
+    except Exception as exc:
+        logger.warning("Lifespan: browser init failed (%s) — pipeline not started.", exc)
+
     yield
 
-    # Graceful shutdown
-    ctx = await get_ctx()
     if ctx.browser:
         await ctx.browser.close()
 
-
-# ── CLI Session Commands ───────────────────────────────────────────────────────
 
 async def run_session_commands(settings: Settings) -> bool:
     """Handle CLI lifecycle commands: --login, --login-auto, --status, --logout."""

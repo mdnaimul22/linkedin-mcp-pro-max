@@ -1,5 +1,3 @@
-"""MCP Tools for LinkedIn content and feed interaction."""
-
 import json
 import logging
 from typing import Optional

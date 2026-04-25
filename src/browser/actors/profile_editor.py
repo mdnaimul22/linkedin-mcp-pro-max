@@ -1,5 +1,3 @@
-"""LinkedIn profile editing actors (headline, summary, experience, skills)."""
-
 import asyncio
 import logging
 from typing import Any, Literal
@@ -205,6 +203,141 @@ class ProfileEditor:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    async def upsert_education(
+        self,
+        profile_id: str,
+        school: str,
+        degree: str,
+        field_of_study: str | None = None,
+        grade: str | None = None,
+        start_year: str | None = None,
+        end_year: str | None = None,
+        description: str | None = None,
+        education_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Add or update an education entry."""
+        if education_id:
+            url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/education/{education_id}/"
+        else:
+            url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/education/new/"
+
+        try:
+            await self.page.goto(url, wait_until="load", timeout=60000)
+            await stabilize_navigation(self.page)
+            await self._force_notify_network_off()
+
+            # Fill School
+            school_input = self.page.locator('input[id$="-school"]').first
+            await school_input.fill(school)
+            await asyncio.sleep(1.5)
+            await self.page.keyboard.press("ArrowDown")
+            await self.page.keyboard.press("Enter")
+
+            # Fill Degree
+            degree_input = self.page.locator('input[id$="-degree"]').first
+            await degree_input.fill(degree)
+            await asyncio.sleep(1.5)
+            await self.page.keyboard.press("ArrowDown")
+            await self.page.keyboard.press("Enter")
+
+            if field_of_study:
+                field_input = self.page.locator('input[id$="-fieldOfStudy"]').first
+                if await field_input.is_visible():
+                    await field_input.fill(field_of_study)
+                    await asyncio.sleep(1.5)
+                    await self.page.keyboard.press("ArrowDown")
+                    await self.page.keyboard.press("Enter")
+
+            if grade:
+                grade_input = self.page.locator('input[id$="-grade"]').first
+                if await grade_input.is_visible():
+                    await grade_input.fill(grade)
+
+            if start_year:
+                await self.page.locator(
+                    'select[id$="-dateRange-start-date-year-select"]'
+                ).select_option(label=start_year)
+            if end_year:
+                await self.page.locator(
+                    'select[id$="-dateRange-end-date-year-select"]'
+                ).select_option(label=end_year)
+
+            if description:
+                await self.page.locator('textarea[id$="-description"]').first.fill(
+                    description
+                )
+
+            await self.page.locator(
+                'button.artdeco-button--primary:has-text("Save")'
+            ).first.click()
+            await asyncio.sleep(2)
+
+            error_text, suggestion = await self._get_ui_error_and_suggestion()
+            if error_text:
+                return {
+                    "status": "error",
+                    "message": error_text,
+                    "suggestion": suggestion,
+                }
+
+            return {"status": "success", "message": "Education saved."}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    async def update_cover_image(self, profile_id: str, image_path: str) -> dict[str, Any]:
+        """Update the LinkedIn profile background/cover image."""
+        url = f"https://www.linkedin.com/in/{profile_id}/"
+        try:
+            await self.page.goto(url, wait_until="load", timeout=60000)
+            await stabilize_navigation(self.page)
+
+            # Look for edit background button
+            edit_btn_selector = 'button[aria-label*="Edit background"], .profile-background-image__edit-btn, button:has(.profile-background-image__edit-icon)'
+            edit_btn = self.page.locator(edit_btn_selector).first
+            
+            if not await edit_btn.is_visible():
+                # Force visibility or scroll
+                await edit_btn.scroll_into_view_if_needed()
+                await asyncio.sleep(1)
+            
+            await edit_btn.click()
+            logger.info("Clicked edit background button, waiting for modal...")
+            await asyncio.sleep(3)
+
+            # LinkedIn often uses a hidden input[type="file"] with a specific ID pattern
+            file_input_selector = 'input[type="file"][id*="image-upload"], input[type="file"][name="file"], input[type="file"]'
+            file_input = self.page.locator(file_input_selector).first
+            
+            # Wait up to 5 seconds for the input to be attached to DOM
+            try:
+                await self.page.wait_for_selector(file_input_selector, state="attached", timeout=5000)
+            except Exception:
+                pass
+
+            if await file_input.count() == 0:
+                 return {"status": "error", "message": "File upload input not found after clicking edit button."}
+
+            logger.info("Uploading image: %s", image_path)
+            await file_input.set_input_files(image_path)
+            
+            # Wait for the 'Apply' or 'Save' button in the editor modal
+            # LinkedIn UI can be slow here while it processes the image
+            apply_btn_selector = 'button.artdeco-button--primary:has-text("Apply"), button:has-text("Apply"), button:has-text("Save")'
+            await self.page.wait_for_selector(apply_btn_selector, state="visible", timeout=30000)
+            
+            apply_btn = self.page.locator(apply_btn_selector).first
+            if await apply_btn.is_visible():
+                logger.info("Clicking Apply/Save button")
+                await apply_btn.click()
+                await asyncio.sleep(5) # Wait for processing and page refresh
+                return {"status": "success", "message": "Cover image updated successfully."}
+            else:
+                return {"status": "error", "message": "Apply/Save button not found after upload."}
+
+        except Exception as e:
+            logger.error("Failed to update cover image: %s", e)
+            return {"status": "error", "message": str(e)}
+
     async def remove_experience(
         self,
         profile_id: str,
@@ -276,6 +409,8 @@ class ProfileEditor:
 
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+
 
     async def manage_skills(
         self, profile_id: str, skill_name: str, action: Literal["add", "delete"] = "add"

@@ -1,12 +1,3 @@
-"""Low-level Playwright browser driver.
-
-Handles browser launch, CDP connection, and storage state export.
-
-Dependency Rule:
-  imports FROM: standard library, exceptions
-  MUST NOT import: api, session, providers, services, tools, config
-"""
-
 from __future__ import annotations
 
 import logging

@@ -1,15 +1,8 @@
-"""Job search service with caching.
-
-Dependency Rule:
-  imports FROM: schema, api, services/helpers
-  MUST NOT import: browser, session, providers, tools
-"""
-
 import logging
 from typing import Any
 
-from schema.jobs import JobDetails, JobListing, JobSearchFilter
-from api.linkedin import LinkedInClient
+from schema import JobDetails, JobListing, JobSearchFilter
+from providers.linkedin import LinkedInClient
 from services.helpers import JSONCache
 
 logger = logging.getLogger("linkedin-mcp.services.jobs")
