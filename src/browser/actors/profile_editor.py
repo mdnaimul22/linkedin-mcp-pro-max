@@ -2,22 +2,18 @@ import asyncio
 import logging
 from typing import Any, Literal
 from patchright.async_api import Page
+from browser.helpers.executor import ApiExecutor
+from browser.helpers import stabilize_navigation, wait_for_any_selector
 
-from browser.helpers import stabilize_navigation
-
-logger = logging.getLogger("linkedin-mcp.browser.actors.profile_editor")
+logger = logging.getLogger("browser.actors.profile_editor")
 
 
 class ProfileEditor:
-    """Specialized actor for modifying LinkedIn profile content."""
-
     def __init__(self, page: Page) -> None:
         self.page = page
 
     async def update_headline(self, profile_id: str, headline: str) -> dict[str, Any]:
-        """Update the LinkedIn headline."""
         edit_url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/intro/new/"
-        logger.info("Updating headline: %s", edit_url)
 
         try:
             await self.page.goto(edit_url, wait_until="load", timeout=60000)
@@ -25,12 +21,9 @@ class ProfileEditor:
             await self._force_notify_network_off()
 
             headline_selector = '[id$="-headline"]'
-            await self.page.wait_for_selector(
-                headline_selector, state="visible", timeout=10000
-            )
+            await self.page.wait_for_selector(headline_selector, state="visible", timeout=10000)
             await self.page.locator(headline_selector).first.fill(headline)
 
-            # Mandatory Industry check
             industry_input = self.page.locator('input[id$="-industryId"]').first
             if await industry_input.is_visible():
                 val = await industry_input.input_value()
@@ -40,11 +33,8 @@ class ProfileEditor:
                     await self.page.keyboard.press("ArrowDown")
                     await self.page.keyboard.press("Enter")
 
-            await self.page.locator(
-                'button.artdeco-button--primary:has-text("Save")'
-            ).first.click()
+            await self.page.locator('button.artdeco-button--primary:has-text("Save")').first.click()
 
-            # Check for errors
             try:
                 await self.page.wait_for_selector(
                     ".artdeco-inline-feedback--error", timeout=2000
@@ -61,9 +51,7 @@ class ProfileEditor:
             return {"status": "error", "message": str(e)}
 
     async def update_summary(self, profile_id: str, summary: str) -> dict[str, Any]:
-        """Update the LinkedIn 'About' summary."""
         edit_url = f"https://www.linkedin.com/in/{profile_id}/edit/about/"
-        logger.info("Updating summary: %s", edit_url)
 
         try:
             await self.page.goto(edit_url, wait_until="load", timeout=60000)
@@ -110,7 +98,7 @@ class ProfileEditor:
         is_current: bool = True,
         position_id: str | None = None,
     ) -> dict[str, Any]:
-        """Add or update a work experience entry."""
+
         if position_id:
             url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/position/{position_id}/"
         else:
@@ -124,6 +112,8 @@ class ProfileEditor:
             # SELF-HEALING: Use ApiExecutor to discover fields dynamically
             from browser.helpers.executor import ApiExecutor
             executor = ApiExecutor(self.page)
+            # Ensure at least one input/textarea is visible before discovery
+            await wait_for_any_selector(self.page, ["input", "textarea"], timeout=10000)
             discovery = await executor.discover()
 
             def find_field(label_query: str, fields: list):
@@ -204,8 +194,7 @@ class ProfileEditor:
                 else:
                     await self.page.locator('select[id$="-dateRange-start-date-year-select"]').select_option(label=start_date_year)
 
-            # Current role checkbox logic
-            # The most reliable way to check the toggle state is by looking at the end-date dropdown's disabled state
+
             end_date_select = self.page.locator('select[id$="-dateRange-end-date"]').first
             is_end_date_disabled = True
             if await end_date_select.count() > 0:
@@ -213,10 +202,10 @@ class ProfileEditor:
 
             needs_toggle = False
             if is_current and not is_end_date_disabled:
-                # User is current, but end date is enabled -> needs checking
+
                 needs_toggle = True
             elif not is_current and is_end_date_disabled:
-                # User is not current, but end date is disabled -> needs unchecking
+
                 needs_toggle = True
 
             if needs_toggle:
@@ -265,19 +254,18 @@ class ProfileEditor:
         description: str | None = None,
         education_id: str | None = None,
     ) -> dict[str, Any]:
-        """Add or update an education entry."""
+
         if education_id:
             url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/education/{education_id}/"
         else:
-            # Check if we should try to find an existing one first to prevent duplicates
-            # (Future improvement: match by school/degree)
             url = f"https://www.linkedin.com/in/{profile_id}/edit/forms/education/new/"
 
         try:
             await self.page.goto(url, wait_until="load", timeout=60000)
-            # SELF-HEALING: Use ApiExecutor to discover fields dynamically
-            from browser.helpers.executor import ApiExecutor
+
             executor = ApiExecutor(self.page)
+
+            await wait_for_any_selector(self.page, ["input", "textarea"], timeout=10000)
             discovery = await executor.discover()
 
             def find_field(label_query: str, fields: list):
@@ -286,7 +274,6 @@ class ProfileEditor:
                         return f
                 return None
 
-            # Map fields to values
             field_map = {
                 "school": school,
                 "degree": degree,
@@ -299,7 +286,6 @@ class ProfileEditor:
                 if not value:
                     continue
                 
-                # Try discovery first
                 field = find_field(label_key, discovery.inputs + discovery.textareas)
                 if field and field.id:
                     selector = f"#{field.id}"
@@ -310,7 +296,6 @@ class ProfileEditor:
                         await self.page.keyboard.press("ArrowDown")
                         await self.page.keyboard.press("Enter")
                 else:
-                    # Fallback to stable suffixes if discovery fails
                     selector = f'input[id$="-{label_key}"], textarea[id$="-{label_key}"]'
                     if label_key == "fieldOfStudy":
                         selector = 'input[id$="-fieldOfStudy"]'
@@ -325,7 +310,6 @@ class ProfileEditor:
                     except Exception as e:
                         logger.warning("Failed to fill field '%s': %s", label_key, e)
 
-            # Date selects (Discovery for selects is also possible)
             if start_year:
                 field = find_field("start date", discovery.selects)
                 if field and field.id:
@@ -363,13 +347,12 @@ class ProfileEditor:
         school: str,
         degree: str,
     ) -> dict[str, Any]:
-        """Remove an education entry by matching school and degree."""
+
         url = f"https://www.linkedin.com/in/{profile_id}/details/education/"
         try:
             await self.page.goto(url, wait_until="load", timeout=60000)
             await stabilize_navigation(self.page)
 
-            # Find the education card containing the school and degree
             education_items = self.page.locator("li.pvs-list__paged-list-item")
             count = await education_items.count()
 
@@ -429,7 +412,7 @@ class ProfileEditor:
             return {"status": "error", "message": str(e)}
 
     async def update_cover_image(self, profile_id: str, image_path: str) -> dict[str, Any]:
-        """Update the LinkedIn profile background/cover image."""
+
         url = f"https://www.linkedin.com/in/{profile_id}/"
         try:
             await self.page.goto(url, wait_until="load", timeout=60000)
@@ -440,7 +423,6 @@ class ProfileEditor:
             edit_btn = self.page.locator(edit_btn_selector).first
             
             if not await edit_btn.is_visible():
-                # Force visibility or scroll
                 await edit_btn.scroll_into_view_if_needed()
                 await asyncio.sleep(1)
             
@@ -448,11 +430,10 @@ class ProfileEditor:
             logger.info("Clicked edit background button, waiting for modal...")
             await asyncio.sleep(3)
 
-            # LinkedIn often uses a hidden input[type="file"] with a specific ID pattern
+
             file_input_selector = 'input[type="file"][id*="image-upload"], input[type="file"][name="file"], input[type="file"]'
             file_input = self.page.locator(file_input_selector).first
             
-            # Wait up to 5 seconds for the input to be attached to DOM
             try:
                 await self.page.wait_for_selector(file_input_selector, state="attached", timeout=5000)
             except Exception:
@@ -464,8 +445,6 @@ class ProfileEditor:
             logger.info("Uploading image: %s", image_path)
             await file_input.set_input_files(image_path)
             
-            # Wait for the 'Apply' or 'Save' button in the editor modal
-            # LinkedIn UI can be slow here while it processes the image
             apply_btn_selector = 'button.artdeco-button--primary:has-text("Apply"), button:has-text("Apply"), button:has-text("Save")'
             await self.page.wait_for_selector(apply_btn_selector, state="visible", timeout=30000)
             
@@ -488,10 +467,10 @@ class ProfileEditor:
         company: str,
         title: str,
     ) -> dict[str, Any]:
-        """Remove a work experience entry by matching title and company."""
+
         url = f"https://www.linkedin.com/in/{profile_id}/details/experience/"
         try:
-            from browser.helpers import stabilize_navigation
+            
             await self.page.goto(url, wait_until="load", timeout=60000)
             await stabilize_navigation(self.page)
 
@@ -651,6 +630,5 @@ class ProfileEditor:
         return None, None
 
 
-# ── Registry Convention ───────────────────────────────────────────────────────
 from helpers.registry import ActorMeta
 ACTOR = ActorMeta(attr="profile_editor", cls=ProfileEditor)

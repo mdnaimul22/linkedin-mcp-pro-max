@@ -77,16 +77,18 @@ uv run linkedin-mcp-pro-max --login-auto
 
 Add to your `claude_desktop_config.json`:
 ```json
-"mcpServers": {
-  "linkedin-mcp-pro-max": {
-    "command": "uv",
-    "args": [
-      "--directory",
-      "/absolute/path/to/linkedin-mcp-pro-max",
-      "run",
-      "linkedin-mcp-pro-max"
-    ]
-  }
+{
+    "mcpServers": {
+        "linkedin-mcp-pro-max": {
+            "command": "/home/naimul/.local/bin/uv",
+            "args": [
+                "--directory",
+                "/home/naimul/linkedin-mcp-pro-max",
+                "run",
+                "linkedin-mcp-pro-max"
+            ]
+        }
+    }
 }
 ```
 

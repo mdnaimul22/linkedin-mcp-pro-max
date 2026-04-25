@@ -117,7 +117,7 @@ class LinkedInClient:
                         "Found browser cookies, attempting to use them for API session."
                     )
                     api = Linkedin(
-                        self._settings.linkedin_username,
+                        self._settings.linkedin_email,
                         self._settings.linkedin_password.get_secret_value(),
                         refresh_cookies=False,
                     )
@@ -134,7 +134,7 @@ class LinkedInClient:
                     return api
 
                 api = Linkedin(
-                    self._settings.linkedin_username,
+                    self._settings.linkedin_email,
                     self._settings.linkedin_password.get_secret_value(),
                     refresh_cookies=False,
                 )

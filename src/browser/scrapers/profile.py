@@ -4,11 +4,11 @@ from patchright.async_api import Page, Locator
 
 from browser.helpers import stabilize_navigation, scroll_to_bottom
 
-logger = logging.getLogger("linkedin-mcp.browser.scrapers.profile")
+logger = logging.getLogger("browser.scrapers.profile")
 
 
 class ProfileScraper:
-    """Specialized scraper for LinkedIn profile pages."""
+    """Specialized scraper for profile pages."""
 
     def __init__(self, page: Page) -> None:
         self.page = page

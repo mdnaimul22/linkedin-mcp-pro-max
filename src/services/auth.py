@@ -33,7 +33,7 @@ class AuthResolver:
         await self.browser.start()
         page = self.browser.page
 
-        username = self.sessions.settings.linkedin_username
+        username = self.sessions.settings.linkedin_email
         password_secret = self.sessions.settings.linkedin_password
         if not username or not password_secret:
             logger.error("LinkedIn credentials missing in settings")

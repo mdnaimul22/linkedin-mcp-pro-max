@@ -11,7 +11,7 @@ from typing import Any
 from config.settings import get_settings
 from helpers import slugify_fragment
 
-logger = logging.getLogger("linkedin-mcp.trace")
+logger = logging.getLogger("browser.trace")
 
 _TRACE_COUNTER = itertools.count(1)
 _TRACE_DIR: Path | None = None

@@ -12,7 +12,7 @@ from browser.actors.auth import validate_linkedin_auth, export_linkedin_cookies
 from helpers.exceptions import AuthenticationError
 from schema import SourceState
 
-logger = logging.getLogger("linkedin-mcp.browser.manager")
+logger = logging.getLogger("browser.manager")
 
 
 class Manager:
@@ -131,7 +131,7 @@ class Manager:
         )
 
     async def get_current_profile_id(self) -> str:
-        """Resolve the authenticated user's LinkedIn profile slug.
+        """Resolve the authenticated user's profile slug.
 
         Result is cached in-session — the /me navigation only runs once per session.
         """
@@ -141,8 +141,13 @@ class Manager:
         logger.info("Resolving current profile ID...")
 
         if self.sessions.settings.linkedin_username:
-            logger.debug("Using profile ID from settings: %s", self.sessions.settings.linkedin_username)
+            logger.debug("Using username as profile ID from settings: %s", self.sessions.settings.linkedin_username)
             self._cached_profile_id = self.sessions.settings.linkedin_username
+            return self._cached_profile_id
+
+        if self.sessions.settings.linkedin_email and "@" not in self.sessions.settings.linkedin_email:
+            logger.debug("Using email field as profile ID from settings: %s", self.sessions.settings.linkedin_email)
+            self._cached_profile_id = self.sessions.settings.linkedin_email
             return self._cached_profile_id
 
         try:

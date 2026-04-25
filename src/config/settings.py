@@ -24,10 +24,11 @@ class Settings(BaseSettings):
     )
 
     # LinkedIn credentials
-    linkedin_username: str = Field(default="", validation_alias="LINKEDIN_USERNAME")
+    linkedin_email: str = Field(default="", validation_alias="LINKEDIN_EMAIL")
     linkedin_password: SecretStr = Field(
         default=SecretStr(""), validation_alias="LINKEDIN_PASSWORD"
     )
+    linkedin_username: str = Field(default="", validation_alias="LINKEDIN_USERNAME")
 
     # AI Provider settings
     anthropic_api_key: SecretStr = Field(
@@ -140,8 +141,8 @@ class Settings(BaseSettings):
     def validate_config(self) -> list[str]:
         """Legacy validation for backward compatibility with cli.py."""
         errors = []
-        if not self.linkedin_username:
-            errors.append("LINKEDIN_USERNAME is required")
+        if not self.linkedin_email:
+            errors.append("LINKEDIN_EMAIL is required")
         if not self.linkedin_password.get_secret_value():
             errors.append("LINKEDIN_PASSWORD is required")
 

@@ -49,12 +49,14 @@ class ProfileService:
                 logger.debug("Failed to resolve profile ID via browser")
 
         # 2. Fallback to settings
-        username = get_settings().linkedin_username
-        if not username:
+        settings = get_settings()
+        resolved_id = settings.linkedin_username or settings.linkedin_email
+        
+        if not resolved_id:
             raise LinkedInMCPError(
-                "LinkedIn username not configured. Set LINKEDIN_USERNAME environment variable."
+                "LinkedIn username or email not configured. Set LINKEDIN_USERNAME or LINKEDIN_EMAIL."
             )
-        return username
+        return resolved_id
 
     async def get_profile(
         self, profile_id: str, use_browser_fallback: bool = True

@@ -7,11 +7,11 @@ from patchright.async_api import Page, BrowserContext
 from browser.helpers import wait_for_any_selector, stabilize_navigation
 from helpers import secure_write_text
 
-logger = logging.getLogger("linkedin-mcp.browser.actors.auth")
+logger = logging.getLogger("browser.actors.auth")
 
 
 async def handle_login_form(page: Page, username: str, password: str) -> bool:
-    """Automate interaction with LinkedIn's login form."""
+    """Automate interaction with the login form."""
     try:
         if "linkedin.com/feed" in page.url:
             logger.info("Already logged in (redirected to feed)")
@@ -72,7 +72,7 @@ async def handle_login_form(page: Page, username: str, password: str) -> bool:
 
 
 async def validate_linkedin_auth(page: Page) -> bool:
-    """Check if the current page is authenticated with LinkedIn."""
+    """Check if the current page is authenticated."""
     try:
         if "linkedin.com/feed" not in page.url:
             await page.goto(
@@ -111,7 +111,7 @@ async def validate_linkedin_auth(page: Page) -> bool:
 
 
 async def export_linkedin_cookies(context: BrowserContext, path: Path) -> bool:
-    """Slice LinkedIn cookies from context and save to portable file."""
+    """Slice cookies from context and save to portable file."""
     try:
         all_cookies = await context.cookies()
         linkedin_cookies = [

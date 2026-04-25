@@ -4,7 +4,7 @@ from typing import Dict, Any
 from patchright.async_api import Page
 from browser.helpers.dom import wait_for_any_selector
 
-logger = logging.getLogger("linkedin-mcp.browser.actors.interactor")
+logger = logging.getLogger("browser.actors.interactor")
 
 
 class ContentInteractor:
@@ -82,7 +82,7 @@ class ContentInteractor:
             return {"status": "error", "message": f"Exception during comment action: {e}"}
 
     async def create_post(self, text: str) -> Dict[str, Any]:
-        """Creates a new post on the user's LinkedIn feed.
+        """Creates a new post on the user's feed.
         
         Args:
             text: The text content of the post to publish.

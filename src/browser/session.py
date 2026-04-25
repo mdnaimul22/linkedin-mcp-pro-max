@@ -10,7 +10,7 @@ from config.settings import Settings
 from helpers import secure_write_text, utcnow_iso
 from schema import RuntimeState, SourceState
 
-logger = logging.getLogger("linkedin-mcp.session")
+logger = logging.getLogger("browser.session")
 
 
 class Session:

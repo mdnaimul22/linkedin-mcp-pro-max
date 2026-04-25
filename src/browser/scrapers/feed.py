@@ -3,17 +3,17 @@ from typing import Any, Dict
 from patchright.async_api import Page
 from browser.helpers.dom import wait_for_any_selector
 
-logger = logging.getLogger("linkedin-mcp.browser.scrapers.feed")
+logger = logging.getLogger("browser.scrapers.feed")
 
 
 class FeedScraper:
-    """Specialized scraper for LinkedIn home feed and posts."""
+    """Specialized scraper for home feed and posts."""
 
     def __init__(self, page: Page) -> None:
         self.page = page
 
     async def read_post(self) -> Dict[str, Any]:
-        """Extract information from a currently loaded LinkedIn post page.
+        """Extract information from a currently loaded post page.
         
         Returns:
             dict with author, content, and engagementCount

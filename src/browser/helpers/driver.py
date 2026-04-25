@@ -13,7 +13,7 @@ from patchright.async_api import (
 
 from helpers.exceptions import NetworkError
 
-logger = logging.getLogger("linkedin-mcp.browser.driver")
+logger = logging.getLogger("browser.driver")
 
 
 class BrowserDriver:
