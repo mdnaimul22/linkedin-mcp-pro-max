@@ -1,106 +1,88 @@
 """
-Architecture
-------------
-All services are auto-discovered from `services/` and wired into AppContext at
-startup. No manual imports or field declarations are needed when adding new
-services — simply add a `SERVICE = ServiceMeta(...)` marker to the module.
-
-Lifecycle
----------
-1. `get_ctx()` → creates AppContext singleton, wires eager services.
-2. `AppContext.initialize_browser()` → starts browser, wires lazy services.
-3. `app_lifespan()` → manages graceful shutdown.
+LinkedIn MCP Pro Max - Composition Root
+---------------------------------------
+This module serves as the entry point and composition root for the MCP server.
+It orchestrates the initialization of shared state, browser automation, 
+and dynamic service wiring.
 """
 
 from __future__ import annotations
-
 import logging
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator, Optional
 
 from fastmcp import FastMCP
 
 from config.settings import Settings, get_settings
-
-from providers.image import ImageProvider
-from providers.linkedin import LinkedInClient
-from providers import BaseProvider, ClaudeProvider, OpenAIProvider
-
 from browser.manager import Manager, create_browser
 from browser.session import Session
 from browser.helpers.executor import ApiExecutor
+from providers.linkedin import LinkedInClient
+from providers.factory import create_ai_provider, create_image_provider
 
+# We keep JSONCache in services.helpers for now as per original structure,
+# but AppContext (the Composition Root) is allowed to import it.
 from services.helpers import JSONCache
 from services.auth import AuthResolver
-
 from helpers.registry import discover_all, get_services
 
 if TYPE_CHECKING:
-    pass
+    from providers import BaseProvider
+    from providers.image import ImageProvider
+    
+    # Type hints for dynamic services (wired at runtime)
+    from services.profile import ProfileService
+    from services.job import JobSearchService
+    from services.tracker import JobTrackerService
+    from services.resume import ResumeGenerator, CoverLetterGenerator
+    from services.analyzer import ProfileAnalyzerService
 
-logger = logging.getLogger("linkedin-mcp-pro-max.app")
-
+logger = logging.getLogger("linkedin-mcp.app")
 
 @dataclass
 class AppContext:
-
+    """
+    Unified application context that manages shared state and service wiring.
+    Acts as the 'brain' of the MCP server, connecting all layers.
+    """
     settings: Settings
     sessions: Session
     client: LinkedInClient
+    
+    # Infrastructure
     lock: asyncio.Lock = field(init=False)
     cache: JSONCache = field(init=False)
-    ai: BaseProvider | None = field(init=False)
-    image_provider: ImageProvider | None = field(init=False)
-    browser: Manager | None = field(default=None)
-    api_executor: ApiExecutor | None = field(default=None)
+    ai: Optional[BaseProvider] = field(init=False)
+    image_provider: Optional[ImageProvider] = field(init=False)
+    
+    # Browser components
+    browser: Optional[Manager] = field(default=None)
+    api_executor: Optional[ApiExecutor] = field(default=None)
+    
+    # Dynamic Service Hints (Satisfies static analysis)
+    profiles: ProfileService = field(init=False)
+    jobs: JobSearchService = field(init=False)
+    tracker: JobTrackerService = field(init=False)
+    resume_gen: ResumeGenerator = field(init=False)
+    cover_letter_gen: CoverLetterGenerator = field(init=False)
+    profile_analyzer: ProfileAnalyzerService = field(init=False)
 
     def __post_init__(self) -> None:
         self.lock = asyncio.Lock()
         self.cache = JSONCache(self.settings.data_dir / "cache")
-
-        provider_type = self.settings.ai_provider.lower()
-        if provider_type == "openai" and self.settings.openai_api_key:
-            self.ai = OpenAIProvider(
-                api_key=self.settings.openai_api_key.get_secret_value(),
-                model=self.settings.ai_model,
-                api_base=self.settings.ai_base_url or None,
-            )
-        elif provider_type == "claude" and self.settings.anthropic_api_key:
-            self.ai = ClaudeProvider(
-                api_key=self.settings.anthropic_api_key.get_secret_value(),
-                model=self.settings.ai_model,
-            )
-        else:
-            self.ai = None
-
-        if self.settings.has_image_gen:
-            self.image_provider = ImageProvider(
-                api_key=self.settings.gemini_api_key,
-                model=self.settings.gemini_image_model,
-            )
-        else:
-            self.image_provider = None
-
+        
+        # Initialize providers via factory
+        self.ai = create_ai_provider(self.settings)
+        self.image_provider = create_image_provider(self.settings)
+        
+        # Phase 1: Wire non-browser dependent services
         self._wire_services(lazy=False)
 
     def _wire_services(self, lazy: bool) -> None:
-        """
-        Wire services from the registry using multi-pass resolution.
-
-        Services with factory lambdas may reference other services on `self`
-        that haven't been wired yet (e.g., cover_letter_gen → ctx.profiles).
-        A multi-pass approach retries failed services until all resolve or
-        no further progress can be made.
-
-        Args:
-            lazy: If True, wire only lazy (browser-dependent) services.
-                  If False, wire only eager (startup-time) services.
-        """
-        
-
+        """Wire services from the registry using multi-pass resolution."""
         pending = [m for m in get_services() if m.lazy == lazy]
-        max_passes = len(pending) + 1  # guaranteed to converge
+        max_passes = len(pending) + 1
 
         for pass_num in range(1, max_passes + 1):
             still_pending = []
@@ -112,29 +94,20 @@ class AppContext:
                         kwargs = {dep: getattr(self, dep, None) for dep in meta.deps}
                         instance = meta.cls(**kwargs)
                     setattr(self, meta.attr, instance)
-                    logger.debug("Wired service: %s → %s (pass %d)", meta.attr, meta.cls.__name__, pass_num)
+                    logger.debug("Wired service: %s \u2192 %s (pass %d)", meta.attr, meta.cls.__name__, pass_num)
                 except Exception as exc:
                     still_pending.append((meta, exc))
 
             if not still_pending:
-                break  # all wired
+                break
             if len(still_pending) == len(pending):
-                # No progress — circular dependency detected, fail fast
                 failed = [(m.attr, m.cls.__name__, str(exc)) for m, exc in still_pending]
                 details = "; ".join(f"{attr} ({cls}): {err}" for attr, cls, err in failed)
-                raise RuntimeError(
-                    f"Circular or unresolvable service dependency detected — "
-                    f"no progress after pass {pass_num}. Failed services: {details}"
-                )
+                raise RuntimeError(f"Service wiring deadlock in pass {pass_num}: {details}")
             pending = [m for m, _ in still_pending]
 
     async def initialize_browser(self) -> None:
-        """
-        Provision the stealth browser automation layer.
-
-        After the browser starts, all lazy (browser-dependent) services
-        are wired with the live browser instance.
-        """
+        """Provision the stealth browser and wire dependent services."""
         if self.browser:
             return
 
@@ -147,6 +120,7 @@ class AppContext:
             slow_mo=self.settings.slow_mo,
         )
 
+        # Phase 2: Wire browser-dependent services
         self._wire_services(lazy=True)
 
         self.api_executor = ApiExecutor(
@@ -154,8 +128,9 @@ class AppContext:
             registry_path=self.settings.data_dir / "api_cookbook.json",
         )
         self.browser.set_api_executor(self.api_executor)
+        logger.info("Browser initialized - all services wired.")
 
-        logger.info("Browser initialized — ready for field discovery.")
+# --- Singleton Management ---
 
 _context: AppContext | None = None
 
@@ -169,35 +144,34 @@ async def get_ctx() -> AppContext:
         _context = AppContext(settings, sessions, client)
     return _context
 
+# --- MCP Server Setup ---
 
 mcp = FastMCP("LinkedIn MCP Pro Max")
 
-import tools  # Register all MCP tools
+# Auto-discover all components
+import tools  # noqa: F401
 discover_all()
 
 @mcp.lifespan()
 async def app_lifespan(server: FastMCP) -> AsyncIterator[None]:
-    """Manage MCP server startup and graceful shutdown.
-
-    Startup: initialize browser + bind sniffer + start DiscoveryPipeline.
-    Shutdown: stop pipeline + close browser gracefully.
-    """
+    """Manage MCP server lifecycle."""
     ctx = await get_ctx()
-
     try:
         await ctx.initialize_browser()
-        logger.info("Lifespan: browser ready — DiscoveryPipeline running in background.")
+        logger.info("MCP server lifespan started.")
     except Exception as exc:
-        logger.warning("Lifespan: browser init failed (%s) — pipeline not started.", exc)
+        logger.warning("Lifespan init failed: %s", exc)
 
     yield
 
     if ctx.browser:
         await ctx.browser.close()
+        logger.info("MCP server lifespan ended.")
 
+# --- CLI Lifecycle Handlers ---
 
 async def run_session_commands(settings: Settings) -> bool:
-
+    """Handle CLI commands: login, status, logout."""
     ctx = await get_ctx()
     await ctx.initialize_browser()
     auth = AuthResolver(ctx.browser, ctx.sessions)

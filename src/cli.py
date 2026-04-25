@@ -74,6 +74,10 @@ Examples:
         "--cdp-url", type=str, help="Connect to an existing browser via CDP URL"
     )
 
+    # If no arguments provided, show help on stderr but continue to start server
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+
     # Parse args (allow passthrough for future FastMCP/Click compatibility)
     args, _ = parser.parse_known_args()
 
