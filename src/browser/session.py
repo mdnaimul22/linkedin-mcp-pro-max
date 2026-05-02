@@ -8,7 +8,7 @@ from config import Settings, setup_logger, exists
 from helpers import secure_write_text, utcnow_iso
 from schema import RuntimeState, SourceState
 
-logger = setup_logger(Settings.LOG_DIR / "browser_session.log", name="browser.session")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.session")
 
 
 class Session:

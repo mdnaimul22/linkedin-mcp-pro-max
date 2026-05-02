@@ -3,7 +3,7 @@ from patchright.async_api import Page
 from browser.helpers.dom import wait_for_any_selector
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "feed_scraper.log", name="browser.scrapers.feed")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.scrapers.feed")
 
 
 class FeedScraper:

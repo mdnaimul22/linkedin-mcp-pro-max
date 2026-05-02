@@ -16,7 +16,7 @@ from patchright.async_api import Page
 from schema import FieldInfo, DiscoveryResult
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "browser_executor.log", name="linkedin-mcp.browser.executor")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="linkedin-mcp.browser.executor")
 
 
 

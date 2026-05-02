@@ -13,7 +13,7 @@ from patchright.async_api import (
 from helpers.exceptions import NetworkError
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "browser_driver.log", name="browser.driver")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.driver")
 
 
 class BrowserDriver:

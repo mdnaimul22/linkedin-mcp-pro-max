@@ -10,7 +10,7 @@ from typing import Any
 from config import Settings, setup_logger, get_settings, ensure_dir
 from helpers import slugify_fragment
 
-logger = setup_logger(Settings.LOG_DIR / "browser_trace.log", name="browser.trace")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.trace")
 
 _TRACE_COUNTER = itertools.count(1)
 _TRACE_DIR: Any | None = None

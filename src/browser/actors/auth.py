@@ -7,7 +7,7 @@ from browser.helpers import wait_for_any_selector, stabilize_navigation
 from helpers import secure_write_text
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "browser_auth.log", name="browser.actors.auth")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.actors.auth")
 
 
 async def handle_login_form(page: Page, username: str, password: str) -> bool:

@@ -5,7 +5,7 @@ from browser.helpers.executor import ApiExecutor
 from browser.helpers import stabilize_navigation, wait_for_any_selector
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "profile_editor.log", name="browser.actors.profile_editor")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.actors.profile_editor")
 
 
 class ProfileEditor:

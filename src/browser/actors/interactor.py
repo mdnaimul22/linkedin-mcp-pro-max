@@ -4,7 +4,7 @@ from patchright.async_api import Page
 from browser.helpers.executor import ApiExecutor
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "content_interactor.log", name="linkedin-mcp.browser.actors.interactor")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="linkedin-mcp.browser.actors.interactor")
 
 class ContentInteractor:
     """

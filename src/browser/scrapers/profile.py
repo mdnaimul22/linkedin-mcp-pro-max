@@ -4,7 +4,7 @@ from patchright.async_api import Page, Locator
 from browser.helpers import stabilize_navigation, scroll_to_bottom
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "profile_scraper.log", name="browser.scrapers.profile")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.scrapers.profile")
 
 
 class ProfileScraper:

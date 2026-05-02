@@ -11,7 +11,7 @@ from helpers.exceptions import AuthenticationError
 from schema import SourceState
 from config import Settings, setup_logger, exists
 
-logger = setup_logger(Settings.LOG_DIR / "browser_manager.log", name="browser.manager")
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.manager")
 
 
 class Manager:
