@@ -23,17 +23,6 @@
 
 ---
 
-## Overview
-
-The browser is evolving from a viewing window to an **Automated Representative**. **LinkedIn MCP Pro Max** is a Next-Gen User Agent. It acts on your behalf using your authorized session, directly passing control to LLMs via the Model Context Protocol.
-
-- **Autonomous Authentication** using headless GUI injection.
-- **Stealth Browsing** via Patchright (bypasses advanced bot detection).
-- **Dynamic Tool Discovery** — Zero-config tool registration via `pkgutil`.
-- **Unified Component Registry** — Services, actors, and scrapers auto-register at startup. `app.py` and `manager.py` never need editing.
-- **Self-Healing Endpoints** — Automatically maps internal LinkedIn APIs when visual UI shifts.
-
----
 
 ## Quick Start
 
