@@ -209,7 +209,8 @@ scripts/snapshot_dumps/
 # Debug artifacts
 .debug/
 .browser
-.agents
+# .agents is now tracked
+# .agents
 .gemini
 .pytest_cache
 .ruff_cache
@@ -219,5 +220,6 @@ docs/db_schema.md
 docs/profile_mapping.md
 docs/tools_list.md
 docs/saas.js
-.a0proj
+# .a0proj is removed
+# .a0proj
 logs
