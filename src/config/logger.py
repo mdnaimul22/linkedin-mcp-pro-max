@@ -11,8 +11,8 @@ def setup_logger(log_path: Path, name: str = None) -> logging.Logger:
     if logger.handlers:
         return logger
 
-    # Use INFO as default, can be overridden by caller
-    logger.setLevel(logging.INFO)
+    # Use DEBUG as default for now to catch wiring issues
+    logger.setLevel(logging.DEBUG)
 
     # Silence noisy third-party loggers
     logging.getLogger("httpx").setLevel(logging.WARNING)

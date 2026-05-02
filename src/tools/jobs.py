@@ -5,7 +5,7 @@ from app import get_ctx, mcp
 from schema import JobSearchFilter
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "jobs_tool.log", name="linkedin-mcp.tools.jobs")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp.tools.jobs")
 
 
 @mcp.tool()

@@ -18,7 +18,7 @@ from services.jobs import JobSearchService
 from services.profile import ProfileService
 from services.template import TemplateManager
 
-logger = setup_logger(Settings.LOG_DIR / "resume_gen.log", name="linkedin-mcp.services.resume")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.resume")
 
 
 class ResumeGeneratorService:
@@ -237,6 +237,6 @@ from helpers.registry import ServiceMeta
 SERVICE = ServiceMeta(
     attr="resume_gen",
     cls=ResumeGeneratorService,
-    lazy=True,
+    lazy=False,
     factory=lambda ctx: ResumeGeneratorService(ctx.profiles, ctx.jobs, ctx.ai, ctx.template_manager, ctx.settings.DATA_DIR / 'resumes'),
 )

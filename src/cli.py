@@ -6,23 +6,21 @@ This script handles configuration, authentication commands, and starts the serve
 import os
 import sys
 
-# Silence third-party stdout pollution (e.g. fastmcp update checks and banner)
-# These MUST be set before FastMCP is imported via 'app'
-os.environ["FAST_MCP_CHECK_UPDATES"] = "0"
-os.environ["FAST_MCP_BANNER"] = "0"
+# Silence third-party stdout pollution (handled via config.load_dotenv)
+from config import Settings, setup_logger, set_settings, load_dotenv
+load_dotenv()
 
 import argparse
 import asyncio
 import threading
 
 from app import mcp, run_session_commands
-from config import Settings, setup_logger, set_settings
 
 def main():
     """Configure environment and execute the LinkedIn MCP Pro Max service."""
     
     # Initialize unified logger
-    logger = setup_logger(Settings.LOG_DIR / "main.log", name="linkedin-mcp-pro-max.main")
+    logger = setup_logger(Settings.LOG_DIR / "app.log", name="linkedin-mcp-pro-max.main")
 
     # Command Line Interface Setup
     parser = argparse.ArgumentParser(
@@ -108,7 +106,7 @@ Examples:
             from watchfiles import watch
             
             def run_watcher(src_dir: str):
-                watcher_logger = setup_logger(Settings.LOG_DIR / "watcher.log", name="linkedin-mcp.watcher")
+                watcher_logger = setup_logger(Settings.LOG_DIR / "app.log", name="linkedin-mcp.watcher")
                 watcher_logger.info(f"Auto-reload enabled: Watching {src_dir} for changes...")
                 for changes in watch(src_dir):
                     watcher_logger.info(f"Detected changes: {changes}. Restarting server...")

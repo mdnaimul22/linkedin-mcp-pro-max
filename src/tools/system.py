@@ -5,7 +5,7 @@ from fastmcp.exceptions import ToolError
 from app import get_ctx, mcp
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "system_tool.log", name="linkedin-mcp.tools.system")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp.tools.system")
 
 
 @mcp.tool()

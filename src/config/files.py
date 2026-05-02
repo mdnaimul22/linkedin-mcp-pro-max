@@ -24,9 +24,9 @@ def write_json(relative_path: str, data: Any, indent: int = 2) -> None:
 def exists(relative_path: str) -> bool:
     return _abs(relative_path).exists()
 
-def ensure_dir(relative_path: str) -> Path:
+def ensure_dir(relative_path: str, mode: int = 0o777) -> Path:
     path = _abs(relative_path)
-    path.mkdir(parents=True, exist_ok=True)
+    path.mkdir(mode=mode, parents=True, exist_ok=True)
     return path
 
 def delete(relative_path: str) -> None:

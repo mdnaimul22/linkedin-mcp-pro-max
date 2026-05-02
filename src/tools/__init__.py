@@ -7,7 +7,7 @@ import importlib
 import os
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "tools.log", name="linkedin-mcp-pro-max.tools")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp-pro-max.tools")
 
 
 def discover_tools():

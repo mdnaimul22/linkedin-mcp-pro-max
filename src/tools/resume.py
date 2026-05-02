@@ -4,7 +4,7 @@ from app import get_ctx, mcp
 from helpers.exceptions import LinkedInMCPError
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "resume_tool.log", name="linkedin-mcp.tools.resume")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp.tools.resume")
 
 _VALID_FORMATS = {"html", "md", "pdf"}
 
@@ -25,7 +25,7 @@ async def generate_resume(
 
     Args:
         profile_id: LinkedIn profile ID or 'me' for self
-        template: Template name (modern, professional, minimal)
+        template: Template name (modern, professional)
         output_format: Output format (html, md, pdf)
     """
     _validate_format(output_format)
@@ -53,7 +53,7 @@ async def tailor_resume(
     Args:
         profile_id: LinkedIn profile ID or 'me' for self
         job_id: LinkedIn job ID to tailor the resume for
-        template: Template name (modern, professional, minimal)
+        template: Template name (modern, professional)
         output_format: Output format (html, md, pdf)
     """
     _validate_format(output_format)

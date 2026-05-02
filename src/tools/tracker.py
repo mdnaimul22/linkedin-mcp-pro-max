@@ -7,7 +7,7 @@ from app import get_ctx, mcp
 from schema import TrackedApplication, StatusType
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "tracker_tool.log", name="linkedin-mcp.tools.tracker")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp.tools.tracker")
 
 
 @mcp.tool()

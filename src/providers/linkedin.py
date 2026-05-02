@@ -27,7 +27,7 @@ from providers.helpers import AsyncRateLimiter
 if TYPE_CHECKING:
     from browser.helpers.sniffer import NetworkSniffer
 
-logger = setup_logger(Settings.LOG_DIR / "linkedin_api.log", name="linkedin-mcp.api")
+logger = setup_logger(Settings.LOG_DIR / "provider.log", name="linkedin-mcp.api")
 
 JOB_TYPE_MAP: dict[str, str] = {
     "FULL_TIME": "F",
@@ -387,9 +387,7 @@ class LinkedInClient:
         return JobDetails(
             job_id=job_id,
             title=job.get("title", "Unknown"),
-            company=job.get("companyDetails", {}).get(
-                "company", job.get("companyName", "Unknown")
-            ),
+            company=job.get("companyName") or job.get("companyDetails", {}).get("companyName") or job.get("companyDetails", {}).get("company", "Unknown"),
             location=job.get("formattedLocation", job.get("location", "")),
             description=description if isinstance(description, str) else "",
             url=f"https://www.linkedin.com/jobs/view/{job_id}",

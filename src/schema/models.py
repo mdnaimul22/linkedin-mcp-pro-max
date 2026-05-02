@@ -10,8 +10,8 @@ def _format_timestamp(value: Any) -> str:
         if isinstance(value, (int, float)) and value > 0:
             return datetime.fromtimestamp(value / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
     except (TypeError, ValueError):
-        pass
-    return str(value) if value else ""
+        return str(value) if value else ""
+    return ""  # Should not be reached but for safety
 
 
 def _format_date_obj(date_obj: dict[str, Any] | None) -> str:

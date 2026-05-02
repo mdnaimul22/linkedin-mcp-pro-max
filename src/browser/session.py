@@ -216,5 +216,5 @@ class Session:
             return None
 
     def _write_json(self, path: Any, data: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_dir(str(path.parent))
         secure_write_text(path, json.dumps(data, indent=2, sort_keys=True) + "\n")

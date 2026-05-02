@@ -10,7 +10,7 @@ from providers.base import BaseProvider
 from helpers.exceptions import AIProviderError
 from config import Settings, setup_logger, ensure_dir
 
-logger = setup_logger(Settings.LOG_DIR / "openai_provider.log", name="linkedin-mcp.openai")
+logger = setup_logger(Settings.LOG_DIR / "provider.log", name="linkedin-mcp.openai")
 
 
 def _iso_now() -> str:

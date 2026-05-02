@@ -7,7 +7,7 @@ from config import Settings, setup_logger
 from helpers.exceptions import LinkedInMCPError
 from services.helpers.mapping import map_profile_browser
 
-logger = setup_logger(Settings.LOG_DIR / "profile_service.log", name="linkedin-mcp.services.profile")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.profile")
 
 
 class ProfileService:
@@ -20,6 +20,16 @@ class ProfileService:
     ) -> None:
         self._client = client
         self._browser = browser
+
+    @property
+    def browser(self) -> Optional[Manager]:
+        """Get the current browser manager instance."""
+        return self._browser
+
+    @browser.setter
+    def browser(self, value: Manager) -> None:
+        """Update the browser manager instance (used for post-initialization wiring)."""
+        self._browser = value
 
     async def resolve_profile_id(self, profile_id: str) -> str:
         """Resolve 'me' to the authenticated user's profile ID.
@@ -77,6 +87,8 @@ class ProfileService:
 
         # 2. Browser Enrichment (if API failed or returned thin data)
         is_thin = not profile or not profile.skills or not profile.experience
+        logger.debug(f"Profile enrichment check for {target_id}: is_thin={is_thin}, fallback={use_browser_fallback}, has_browser={self._browser is not None}")
+        
         if is_thin and use_browser_fallback and self._browser:
             logger.info(f"Attempting high-fidelity browser scraping for {target_id}")
             try:
@@ -120,5 +132,5 @@ SERVICE = ServiceMeta(
     attr="profiles",
     cls=ProfileService,
     deps=['client', 'browser'],
-    lazy=True,
+    lazy=False,
 )

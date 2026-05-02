@@ -9,7 +9,7 @@ from typing import List, Optional
 from providers.base import BaseProvider
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "providers.log", name="linkedin-mcp.providers.ensemble")
+logger = setup_logger(Settings.LOG_DIR / "provider.log", name="linkedin-mcp.providers.ensemble")
 
 
 class EnsembleProvider(BaseProvider):

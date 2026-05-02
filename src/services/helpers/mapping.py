@@ -6,7 +6,7 @@ from schema import (
 )
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "mapping.log", name="linkedin-mcp.services.helpers.mapping")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.helpers.mapping")
 
 
 def map_profile_api(

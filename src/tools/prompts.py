@@ -6,7 +6,7 @@ from config.prompts import (
     MCP_PROFILE_OPTIMIZATION,
 )
 
-logger = setup_logger(Settings.LOG_DIR / "prompts_tool.log", name="linkedin-mcp.tools.prompts")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp.tools.prompts")
 
 
 @mcp.prompt()

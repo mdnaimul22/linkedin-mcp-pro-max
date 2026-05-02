@@ -199,7 +199,8 @@ class ApiExecutor:
                     await locator.scroll_into_view_if_needed()
                     await locator.click()
                     return True
-                except: pass
+                except Exception as e:
+                    logger.debug(f"Failed to click button with id {b.id}: {e}")
                 
         # 2. Direct locator fallback for text
         try:
@@ -207,7 +208,8 @@ class ApiExecutor:
             if await btn.is_visible():
                 await btn.click()
                 return True
-        except: pass
+        except Exception as e:
+            logger.debug(f"Failed to click button by text '{label_query}': {e}")
         
         return False
 

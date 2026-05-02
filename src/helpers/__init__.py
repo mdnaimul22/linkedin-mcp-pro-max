@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Any
 from config import Settings, setup_logger, ensure_dir, exists, delete
 
-logger = setup_logger(Settings.LOG_DIR / "helpers.log", name="linkedin-mcp.helpers")
+logger = setup_logger(Settings.LOG_DIR / "helper.log", name="linkedin-mcp.helpers")
 
 
 def sanitize_filename(value: str, max_length: int = 200) -> str:

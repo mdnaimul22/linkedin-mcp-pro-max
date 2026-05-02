@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from config.settings import Settings as SettingsType
     from providers import BaseProvider
 
-logger = setup_logger(Settings.LOG_DIR / "providers.log", name="linkedin-mcp.providers.factory")
+logger = setup_logger(Settings.LOG_DIR / "provider.log", name="linkedin-mcp.providers.factory")
 
 def create_ai_provider(settings: SettingsType) -> BaseProvider | None:
     """Factory to create the configured AI provider."""

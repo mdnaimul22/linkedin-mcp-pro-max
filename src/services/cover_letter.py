@@ -12,7 +12,7 @@ from services.jobs import JobSearchService
 from services.profile import ProfileService
 from services.template import TemplateManager
 
-logger = setup_logger(Settings.LOG_DIR / "cover_letter_gen.log", name="linkedin-mcp.services.cover_letter")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.cover_letter")
 
 
 class CoverLetterGeneratorService:
@@ -64,7 +64,7 @@ class CoverLetterGeneratorService:
                     candidate_name=profile.name,
                     candidate_contact=f"{profile.email} | {profile.phone}".strip(" |"),
                     recipient=ai_content.get("recipient", "Hiring Manager"),
-                    company=job.company,
+                    company=job.company if job.company != "Unknown" else "your company",
                     job_title=job.title,
                     greeting=ai_content.get("greeting", "Dear Hiring Manager,"),
                     introduction=ai_content.get("introduction", ""),
@@ -203,6 +203,6 @@ from helpers.registry import ServiceMeta
 SERVICE = ServiceMeta(
     attr="cover_letter_gen",
     cls=CoverLetterGeneratorService,
-    lazy=True,
+    lazy=False,
     factory=lambda ctx: CoverLetterGeneratorService(ctx.profiles, ctx.jobs, ctx.ai, ctx.template_manager, ctx.settings.DATA_DIR / 'cover_letters'),
 )

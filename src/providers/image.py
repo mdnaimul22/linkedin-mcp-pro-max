@@ -8,7 +8,7 @@ from typing import Any
 from helpers.exceptions import AIProviderError
 from config import Settings, setup_logger, ensure_dir
 
-logger = setup_logger(Settings.LOG_DIR / "image_provider.log", name="linkedin-mcp.providers.image")
+logger = setup_logger(Settings.LOG_DIR / "provider.log", name="linkedin-mcp.providers.image")
 
 
 class ImageProvider:

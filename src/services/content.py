@@ -13,7 +13,7 @@ from config.prompts import (
     CONTENT_GENERATION_USER_PROMPT_TEMPLATE,
 )
 
-logger = setup_logger(Settings.LOG_DIR / "content.log", name="linkedin-mcp.services.content")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.content")
 
 # ── Image prompt generation prompts ──────────────────────────────────────────
 

@@ -124,7 +124,13 @@ class AppContext:
             slow_mo=self.settings.slow_mo,
         )
 
-        # Phase 2: Wire browser-dependent services
+        # Phase 2: Provision browser-dependent services
+        # 1. Update existing ProfileService instance with the new browser
+        if hasattr(self, 'profiles'):
+            self.profiles.browser = self.browser
+            logger.debug("Updated profiles service with active browser session.")
+
+        # 2. Wire lazy services (they will pick up the updated ctx.profiles automatically)
         self._wire_services(lazy=True)
 
         self.api_executor = ApiExecutor(
@@ -137,15 +143,25 @@ class AppContext:
 # --- Singleton Management ---
 
 _context: AppContext | None = None
+_init_lock: asyncio.Lock | None = None
 
 async def get_ctx() -> AppContext:
     """Retrieve or lazily initialize the global AppContext singleton."""
-    global _context
-    if not _context:
-        settings = Settings
-        sessions = Session(settings)
-        client = LinkedInClient(settings)
-        _context = AppContext(settings, sessions, client)
+    global _context, _init_lock
+    if _context:
+        return _context
+        
+    if _init_lock is None:
+        _init_lock = asyncio.Lock()
+        
+    async with _init_lock:
+        if not _context:
+            settings = Settings
+            sessions = Session(settings)
+            client = LinkedInClient(settings)
+            _context = AppContext(settings, sessions, client)
+            # Ensure browser and lazy services are ready on first use
+            await _context.initialize_browser()
     return _context
 
 # --- MCP Server Setup ---

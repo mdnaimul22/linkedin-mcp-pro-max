@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Type
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "registry.log", name="linkedin-mcp-pro-max.registry")
+logger = setup_logger(Settings.LOG_DIR / "helper.log", name="linkedin-mcp-pro-max.registry")
 
 
 @dataclass

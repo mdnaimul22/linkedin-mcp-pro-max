@@ -8,6 +8,10 @@ _DOTENV_PATH = ".env"
 def load_dotenv(path: str = _DOTENV_PATH) -> None:
     if not files.exists(path):
         return
+    # Set project defaults for third-party libs before loading .env
+    os.environ.setdefault("FAST_MCP_CHECK_UPDATES", "0")
+    os.environ.setdefault("FAST_MCP_BANNER", "0")
+    
     for line in files.read_text(path).splitlines():
         line = line.strip()
         if not line or line.startswith("#"):

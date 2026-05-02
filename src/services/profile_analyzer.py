@@ -3,7 +3,7 @@ from typing import Any
 from providers.base import BaseProvider
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "profile_analyzer.log", name="linkedin-mcp.services.profile_analyzer")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.profile_analyzer")
 
 
 class ProfileAnalyzerService:

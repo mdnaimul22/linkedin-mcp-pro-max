@@ -5,7 +5,7 @@ from jinja2.sandbox import SandboxedEnvironment
 from config import Settings, setup_logger, ensure_dir, exists
 from helpers.exceptions import TemplateError
 
-logger = setup_logger(Settings.LOG_DIR / "template.log", name="linkedin-mcp.services.template")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.template")
 
 
 class TemplateManager:

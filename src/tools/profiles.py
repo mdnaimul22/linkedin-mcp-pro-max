@@ -5,7 +5,7 @@ from app import get_ctx, mcp
 from helpers.exceptions import LinkedInMCPError
 from config import Settings, setup_logger
 
-logger = setup_logger(Settings.LOG_DIR / "profiles_tool.log", name="linkedin-mcp.tools.profiles")
+logger = setup_logger(Settings.LOG_DIR / "tool.log", name="linkedin-mcp.tools.profiles")
 
 
 @mcp.tool()

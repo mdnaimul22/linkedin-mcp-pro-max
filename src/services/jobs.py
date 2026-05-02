@@ -5,7 +5,7 @@ from schema import JobDetails, JobListing, JobSearchFilter
 from providers.linkedin import LinkedInClient
 from services.helpers import JSONCache
 
-logger = setup_logger(Settings.LOG_DIR / "jobs_service.log", name="linkedin-mcp.services.jobs")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.jobs")
 
 
 class JobSearchService:

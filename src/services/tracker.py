@@ -7,9 +7,9 @@ from typing import Any
 
 from schema import StatusType, TrackedApplication
 from helpers import sanitize_filename
-from config import Settings, setup_logger, exists, delete
+from config import Settings, setup_logger, exists, delete, ensure_dir
 
-logger = setup_logger(Settings.LOG_DIR / "tracker_service.log", name="linkedin-mcp.services.tracker")
+logger = setup_logger(Settings.LOG_DIR / "service.log", name="linkedin-mcp.services.tracker")
 
 
 class ApplicationTrackerService:
@@ -17,7 +17,7 @@ class ApplicationTrackerService:
 
     def __init__(self, data_dir: Any) -> None:
         self._dir = data_dir / "applications"
-        self._dir.mkdir(parents=True, exist_ok=True)
+        ensure_dir(str(self._dir))
 
     def _path(self, job_id: str) -> Any:
         """Get the path for an application tracking file."""

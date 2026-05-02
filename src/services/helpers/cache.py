@@ -6,7 +6,7 @@ from typing import Any
 from config import Settings, setup_logger, ensure_dir, exists, delete
 from helpers import sanitize_filename
 
-logger = setup_logger(Settings.LOG_DIR / "cache.log", name="linkedin-mcp.cache")
+logger = setup_logger(Settings.LOG_DIR / "helper.log", name="linkedin-mcp.cache")
 
 
 class JSONCache:

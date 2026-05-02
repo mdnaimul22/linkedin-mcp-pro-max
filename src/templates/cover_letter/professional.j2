@@ -3,104 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cover Letter - {{ candidate_name }}</title>
+    <title>Cover Letter — {{ candidate_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #0a66c2;
-            --text-color: #333;
-            --light-text: #666;
+            --ink:        #1a1a1a;
+            --ink-mid:    #3d3d3d;
+            --ink-soft:   #6b6b6b;
+            --ink-light:  #9a9a9a;
+            --rule:       #d0ccc6;
+            --bg:         #fdfcf9;
+            --white:      #ffffff;
+            --accent:     #8b0000;
         }
+
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
         body {
-            font-family: 'Calibri', 'Arial', sans-serif;
+            font-family: 'EB Garamond', Georgia, serif;
+            font-size: 15px;
             line-height: 1.6;
-            color: var(--text-color);
-            max-width: 8.5in;
-            margin: 0 auto;
-            padding: 1in;
+            color: var(--ink);
+            background: var(--bg);
+            margin: 0;
+            padding: 0;
         }
 
+        @page {
+            margin: 0;
+            size: A4;
+        }
+
+        @media print {
+            body { background: var(--white); }
+            .page { box-shadow: none !important; margin: 0 !important; }
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            background: var(--white);
+            box-shadow: 0 4px 40px rgba(0,0,0,0.07);
+            padding: 56px 64px 80px;
+            position: relative;
+        }
+
+        /* ── Header ─────────────────────────────── */
         .header {
-            margin-bottom: 2rem;
+            text-align: center;
+            border-bottom: 2px solid var(--ink);
+            padding-bottom: 18px;
+            margin-bottom: 30px;
         }
 
         .candidate-name {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-            margin: 0 0 0.25rem 0;
+            font-family: 'EB Garamond', Georgia, serif;
+            font-size: 34px;
+            font-weight: 500;
+            color: var(--ink);
+            margin: 0 0 6px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
         }
 
-        .candidate-contact {
-            color: var(--light-text);
-            font-size: 0.95rem;
+        .candidate-title {
+            font-family: 'Jost', sans-serif;
+            font-size: 10.5px;
+            font-weight: 400;
+            color: var(--ink-soft);
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            margin: 0 0 12px;
+        }
+
+        /* Contact line — centred, pipe-separated */
+        .contact-line {
+            font-family: 'Jost', sans-serif;
+            font-size: 11.5px;
+            color: var(--ink-soft);
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0;
+        }
+
+        .contact-item { display: inline; }
+
+        .contact-item + .contact-item::before {
+            content: '|';
+            margin: 0 10px;
+            color: var(--rule);
+        }
+
+        .contact-item a {
+            color: var(--ink-soft);
+            text-decoration: none;
+        }
+
+        .contact-item a:hover { color: var(--accent); }
+
+        /* ── Meta (date + recipient) ─────────────── */
+        .meta {
+            margin-bottom: 24px;
         }
 
         .date {
-            margin: 1.5rem 0;
-            color: var(--light-text);
+            font-family: 'Jost', sans-serif;
+            font-size: 12px;
+            color: var(--ink-light);
+            margin-bottom: 16px;
+        }
+
+        /* Job reference — subtle, top of letter */
+        .job-ref {
+            font-family: 'Jost', sans-serif;
+            font-size: 11.5px;
+            color: var(--ink-soft);
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px dotted var(--rule);
+        }
+
+        .job-ref strong {
+            color: var(--ink);
+            font-weight: 500;
         }
 
         .recipient {
-            margin-bottom: 1rem;
-        }
-
-        .greeting {
-            margin-bottom: 1rem;
-        }
-
-        .paragraph {
-            margin-bottom: 1rem;
-            text-align: justify;
-        }
-
-        .closing-text {
-            margin-top: 1.5rem;
-            margin-bottom: 2rem;
-            text-align: justify;
-        }
-
-        .signature {
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--ink-mid);
             white-space: pre-line;
+            margin-bottom: 20px;
         }
 
-        .job-ref {
-            margin-top: 3rem;
-            font-size: 0.9rem;
-            color: var(--light-text);
-            border-top: 1px solid #e0e0e0;
-            padding-top: 0.5rem;
+        /* ── Greeting ────────────────────────────── */
+        .greeting {
+            font-size: 15.5px;
+            color: var(--ink);
+            margin-bottom: 20px;
+        }
+
+        /* ── Body paragraphs ─────────────────────── */
+        .letter-body p {
+            font-size: 15px;
+            line-height: 1.8;
+            color: var(--ink-mid);
+            margin: 0 0 16px;
+            text-align: justify;
+        }
+
+        .letter-body p:first-child::first-letter {
+            font-size: 2.5em;
+            font-weight: 600;
+            color: var(--accent);
+            margin-right: 4px;
+            vertical-align: baseline;
+            position: relative;
+            top: -4px;
+            line-height: 0;
+        }
+
+        /* ── Signature ───────────────────────────── */
+        .signature-block {
+            margin-top: 32px;
+        }
+
+        .closing-line {
+            font-size: 15px;
+            color: var(--ink-mid);
+            margin-bottom: 36px;
+        }
+
+        /* Handwritten-feel name via italic Garamond */
+        .sig-name {
+            font-family: 'EB Garamond', Georgia, serif;
+            font-size: 22px;
+            font-style: italic;
+            font-weight: 500;
+            color: var(--ink);
+            margin-bottom: 2px;
+        }
+
+        .sig-title {
+            font-family: 'Jost', sans-serif;
+            font-size: 11.5px;
+            color: var(--ink-light);
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Footer ──────────────────────────────── */
+        .footer {
+            position: absolute;
+            bottom: 22px;
+            left: 64px;
+            right: 64px;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Jost', sans-serif;
+            font-size: 10px;
+            color: var(--ink-light);
+            border-top: 1px solid var(--rule);
+            padding-top: 8px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="candidate-name">{{ candidate_name }}</div>
-        {% if candidate_contact %}
-        <div class="candidate-contact">{{ candidate_contact }}</div>
+<div class="page">
+
+    <!-- ── HEADER ──────────────────────────────── -->
+    <header class="header">
+        <h1 class="candidate-name">{{ candidate_name }}</h1>
+        {% if candidate_title %}
+        <div class="candidate-title">{{ candidate_title }}</div>
         {% endif %}
+
+        <div class="contact-line">
+            {% if candidate_email %}
+            <span class="contact-item"><a href="mailto:{{ candidate_email }}">{{ candidate_email }}</a></span>
+            {% endif %}
+            {% if candidate_phone %}
+            <span class="contact-item">{{ candidate_phone }}</span>
+            {% endif %}
+            {% if candidate_location %}
+            <span class="contact-item">{{ candidate_location }}</span>
+            {% endif %}
+            {% if candidate_linkedin %}
+            <span class="contact-item"><a href="{{ candidate_linkedin }}">LinkedIn</a></span>
+            {% endif %}
+            {% if candidate_website %}
+            <span class="contact-item"><a href="{{ candidate_website }}">{{ candidate_website }}</a></span>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ── LETTER ───────────────────────────────── -->
+
+    <!-- Job reference -->
+    {% if job_title and company %}
+    <div class="job-ref">
+        Re: <strong>{{ job_title }}</strong> position at <strong>{{ company }}</strong>
     </div>
-
-    <div class="date">{{ date }}</div>
-
-    {% if recipient %}
-    <div class="recipient">{{ recipient }}</div>
     {% endif %}
+
+    <div class="meta">
+        <div class="date">{{ date }}</div>
+    </div>
 
     <div class="greeting">{{ greeting }}</div>
 
-    <div class="paragraph">{{ introduction }}</div>
+    <div class="letter-body">
+        <p>{{ introduction }}</p>
+        {% for paragraph in body_paragraphs %}
+        <p>{{ paragraph }}</p>
+        {% endfor %}
+        <p>{{ closing }}</p>
+    </div>
 
-    {% for paragraph in body_paragraphs %}
-    <div class="paragraph">{{ paragraph }}</div>
-    {% endfor %}
+    <div class="signature-block">
+        <div class="sig-name">{{ candidate_name }}</div>
+        {% if candidate_title %}
+        <div class="sig-title">{{ candidate_title }}</div>
+        {% endif %}
+    </div>
 
-    <div class="closing-text">{{ closing }}</div>
+</div>
 
-    <div class="signature">{{ signature }}</div>
+<footer class="footer">
+    <span>{{ candidate_name }}</span>
+    {% if job_title and company %}<span>{{ job_title }} &mdash; {{ company }}</span>{% endif %}
+</footer>
 
-    {% if job_title and company %}
-    <div class="job-ref">Re: {{ job_title }} at {{ company }}</div>
-    {% endif %}
 </body>
 </html>

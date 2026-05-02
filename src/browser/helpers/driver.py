@@ -11,7 +11,7 @@ from patchright.async_api import (
 )
 
 from helpers.exceptions import NetworkError
-from config import Settings, setup_logger
+from config import Settings, setup_logger, ensure_dir
 
 logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.driver")
 
@@ -69,7 +69,7 @@ class BrowserDriver:
                 return self._context
 
             # Ensure the user data directory exists with restrictive permissions
-            os.makedirs(self.user_data_dir, mode=0o700, exist_ok=True)
+            ensure_dir(self.user_data_dir, mode=0o700)
 
             context_options: dict[str, Any] = {
                 "headless": self.headless,
