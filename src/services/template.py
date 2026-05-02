@@ -23,7 +23,8 @@ class TemplateManager:
         for d in (template_dirs or []):
             try:
                 custom_dirs.append(Settings.resolve_path(d))
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to resolve custom template directory '{d}': {e}")
                 pass
         
         self.template_dirs = custom_dirs + [

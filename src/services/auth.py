@@ -90,8 +90,8 @@ class AuthResolver:
                 err_path = self.sessions.auth_root / "login-error.png"
                 await page.screenshot(path=str(err_path))
                 logger.info("Error screenshot saved to %s", err_path)
-            except Exception:
-                pass
+            except Exception as e2:
+                logger.debug(f"Failed to save error screenshot: {e2}")
             return False
 
     async def logout(self) -> bool:

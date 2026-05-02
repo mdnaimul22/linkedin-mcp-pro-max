@@ -30,8 +30,8 @@ class JSONCache:
                 raise ValueError(
                     f"Invalid cache path: namespace={namespace}, key={key}"
                 )
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as e:
+            logger.debug(f"Cache path validation failed: {e}")
         return result
 
     async def get(self, namespace: str, key: str) -> dict[str, Any] | None:
@@ -60,13 +60,16 @@ class JSONCache:
                 if time.time() - cached_at > self._ttl_seconds:
                     try:
                         path.unlink(missing_ok=True)
-                    except Exception: pass
+                    except OSError as e:
+                        logger.debug(f"Failed to delete expired cache file {path}: {e}")
                     return None
                 return cached_at, cached.get("data")
-            except (json.JSONDecodeError, KeyError):
+            except (json.JSONDecodeError, KeyError, OSError) as e:
+                logger.debug(f"Cache read failed for {path}: {e}")
                 try:
                     path.unlink(missing_ok=True)
-                except Exception: pass
+                except OSError as e2:
+                    logger.debug(f"Failed to delete corrupted cache file {path}: {e2}")
                 return None
 
         result = await asyncio.to_thread(_read)
@@ -108,7 +111,8 @@ class JSONCache:
         def _unlink() -> None:
             try:
                 path.unlink(missing_ok=True)
-            except Exception: pass
+            except OSError as e:
+                logger.debug(f"Failed to delete cache file {path}: {e}")
 
         await asyncio.to_thread(_unlink)
 
@@ -126,13 +130,15 @@ class JSONCache:
                     for f in ns_dir.glob("*.json"):
                         try:
                             f.unlink(missing_ok=True)
-                        except Exception: pass
+                        except OSError as e:
+                            logger.debug(f"Failed to delete cache file {f}: {e}")
             elif self._cache_dir.exists():
                 for ns_dir in self._cache_dir.iterdir():
                     if ns_dir.is_dir():
                         for f in ns_dir.glob("*.json"):
                             try:
                                 f.unlink(missing_ok=True)
-                            except Exception: pass
+                            except OSError as e:
+                                logger.debug(f"Failed to delete cache file {f}: {e}")
 
         await asyncio.to_thread(_clear)

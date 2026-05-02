@@ -171,8 +171,8 @@ class ProfileScraper:
                     if " - " in period
                     else "Present",
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error parsing single experience item: {e}")
         return None
 
     async def _scrape_education(self) -> list[dict[str, Any]]:

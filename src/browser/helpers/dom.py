@@ -3,6 +3,9 @@ from typing import Literal
 from patchright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from helpers.exceptions import RateLimitError
+from config import Settings, setup_logger
+
+logger = setup_logger(Settings.LOG_DIR / "browser.log", name="browser.helpers.dom")
 
 
 async def get_page_content(page: Page) -> str:
@@ -10,7 +13,8 @@ async def get_page_content(page: Page) -> str:
     try:
         content = await page.evaluate("() => document.body?.innerText || ''")
         return str(content)
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Failed to get page content: {e}")
         return ""
 
 
@@ -34,6 +38,7 @@ async def stabilize_navigation(
                         state="networkidle", timeout=timeout / 2
                     )
                 except PlaywrightTimeoutError:
+                    logger.debug("stabilize_navigation: networkidle timeout reached (ignored)")
                     pass
             return True
         except PlaywrightTimeoutError:
@@ -47,7 +52,8 @@ async def stabilize_navigation(
 async def is_visible(page: Page, selector: str, timeout: float = 1000) -> bool:
     try:
         return await page.locator(selector).is_visible(timeout=timeout)
-    except Exception:
+    except Exception as e:
+        logger.debug(f"is_visible check failed for '{selector}': {e}")
         return False
 
 
@@ -73,10 +79,11 @@ async def wait_for_any_selector(
                     for sel in selectors:
                         if await page.locator(sel).count() > 0:
                             return sel
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Error checking visibility for selector in wait_for_any_selector: {e}")
                 continue
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Error in wait_for_any_selector: {e}")
     return None
 
 
@@ -118,7 +125,8 @@ async def handle_modal_close(page: Page) -> bool:
             await close.click()
             await asyncio.sleep(0.5)
             return True
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Error handling modal close: {e}")
         pass
     return False
 
@@ -144,5 +152,6 @@ async def scroll_job_sidebar(
             if not scrolled:
                 break
             await asyncio.sleep(pause_time)
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Error scrolling job sidebar: {e}")
         pass

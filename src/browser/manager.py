@@ -152,11 +152,6 @@ class Manager:
             temp_page = await self.page.context.new_page()
             await temp_page.goto("https://www.linkedin.com/me", wait_until="commit", timeout=30000)
             
-            try:
-                await temp_page.wait_for_url("**/in/**", timeout=15000)
-            except Exception:
-                logger.debug(f"URL after /me navigation: {temp_page.url}")
-
             match = re.search(r"linkedin\.com/in/([^/?#]+)", temp_page.url)
             await temp_page.close()
             
@@ -169,8 +164,8 @@ class Manager:
             logger.warning(f"Failed to resolve profile via /me redirect: {e}")
             try:
                 await temp_page.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to close temp page during /me resolution: {e}")
 
         raise AuthenticationError("Could not resolve profile ID and no LINKEDIN_USERNAME in settings.")
 
@@ -187,7 +182,8 @@ class Manager:
             cookies = json.loads(target.read_text())
             await self._context.add_cookies(cookies)
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to import cookies from {target}: {e}")
             return False
 
     # --- PROFILE ---

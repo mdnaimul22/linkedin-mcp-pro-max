@@ -232,8 +232,8 @@ class ContentService:
             if image_path_obj and image_path_obj.exists():
                 try:
                     delete(str(image_path_obj))
-                except Exception:
-                    pass
+                except OSError as e:
+                    logger.debug(f"Failed to delete temporary image file {image_path_obj}: {e}")
 
         return {**result, **browser_result}
 

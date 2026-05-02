@@ -82,7 +82,8 @@ class ApplicationTrackerService:
                 try:
                     with open(f, "r", encoding="utf-8") as fh:
                         results.append(json.load(fh))
-                except Exception:
+                except (json.JSONDecodeError, OSError) as e:
+                    logger.warning(f"Failed to read application file {f}: {e}")
                     continue
             return results
 
@@ -90,7 +91,8 @@ class ApplicationTrackerService:
         for data in await asyncio.to_thread(_list):
             try:
                 apps.append(TrackedApplication(**data))
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to validate application data: {e}")
                 continue
 
         if status:

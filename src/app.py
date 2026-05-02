@@ -112,8 +112,8 @@ class AppContext:
         try:
             if self.browser and getattr(self.browser, "_page", None) and not self.browser._page.is_closed():
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error checking if browser is alive: {e}")
 
         self.browser = await create_browser(
             session_manager=self.sessions,

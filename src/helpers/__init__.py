@@ -37,7 +37,8 @@ def secure_mkdir(path: Any, mode: int = 0o700) -> None:
     ensure_dir(str(path))
     try:
         os.chmod(str(path), mode)
-    except Exception:
+    except OSError as e:
+        logger.debug(f"Failed to set directory permissions on {path}: {e}")
         pass
 
 
@@ -65,5 +66,6 @@ def is_interactive_environment() -> bool:
     """Return True if we appear to be running in an interactive terminal."""
     try:
         return os.isatty(0) and os.isatty(1)
-    except (OSError, AttributeError):
+    except (OSError, AttributeError) as e:
+        logger.debug(f"Failed to detect if environment is interactive: {e}")
         return False

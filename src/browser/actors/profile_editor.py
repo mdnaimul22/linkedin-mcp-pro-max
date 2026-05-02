@@ -45,9 +45,14 @@ class ProfileEditor:
                     "message": error_text,
                     "suggestion": suggestion,
                 }
-            except Exception:
+            except PlaywrightTimeoutError:
+                logger.debug("No UI error feedback found after update_headline. Assuming success.")
                 return {"status": "success", "message": "Headline updated."}
+            except Exception as e:
+                logger.warning(f"Error checking UI feedback in update_headline: {e}")
+                return {"status": "success", "message": "Headline updated (feedback check skipped)."}
         except Exception as e:
+            logger.error(f"Failed to update headline: {e}")
             return {"status": "error", "message": str(e)}
 
     async def update_summary(self, profile_id: str, summary: str) -> dict[str, Any]:
@@ -78,9 +83,14 @@ class ProfileEditor:
                     "message": error_text,
                     "suggestion": suggestion,
                 }
-            except Exception:
+            except PlaywrightTimeoutError:
+                logger.debug("No UI error feedback found after update_summary. Assuming success.")
                 return {"status": "success", "message": "Summary updated."}
+            except Exception as e:
+                logger.warning(f"Error checking UI feedback in update_summary: {e}")
+                return {"status": "success", "message": "Summary updated (feedback check skipped)."}
         except Exception as e:
+            logger.error(f"Failed to update summary: {e}")
             return {"status": "error", "message": str(e)}
 
     async def upsert_experience(
@@ -158,8 +168,9 @@ class ProfileEditor:
                             await asyncio.sleep(1.5)
                             await self.page.keyboard.press("ArrowDown")
                             await self.page.keyboard.press("Enter")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Discovery: fallback failed for '{label_key}': {e}")
+                        continue
 
             if employment_type:
                 field = find_field("employment type", discovery.selects)
@@ -168,7 +179,8 @@ class ProfileEditor:
                 else:
                     try:
                         await self.page.locator('select[id$="-employmentStatus"]').select_option(label=employment_type)
-                    except Exception: pass
+                    except Exception as e:
+                        logger.debug(f"Failed to set employment_type via fallback: {e}")
 
             if start_date_month:
                 field = find_field("start date", discovery.selects) # Usually "Month" is inside a fieldset or labeled
@@ -422,8 +434,10 @@ class ProfileEditor:
             
             try:
                 await self.page.wait_for_selector(file_input_selector, state="attached", timeout=5000)
-            except Exception:
-                pass
+            except PlaywrightTimeoutError:
+                logger.debug("Timed out waiting for file input selector, proceeding anyway.")
+            except Exception as e:
+                logger.debug(f"Error waiting for file input selector: {e}")
 
             if await file_input.count() == 0:
                  return {"status": "error", "message": "File upload input not found after clicking edit button."}
@@ -587,8 +601,8 @@ class ProfileEditor:
                         'label[for*="-notifyNetwork"], .artdeco-toggle'
                     ).first.click()
                     await asyncio.sleep(0.5)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error ensuring network toggle is off: {e}")
 
     async def _get_ui_error_and_suggestion(self) -> tuple[str | None, str | None]:
         """Extract UI error text and provide suggestions."""
@@ -604,8 +618,8 @@ class ProfileEditor:
                 elif "company" in error_text.lower():
                     suggestion = "Company name is required."
                 return error_text, suggestion
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error extracting UI error feedback: {e}")
         return None, None
 
 
