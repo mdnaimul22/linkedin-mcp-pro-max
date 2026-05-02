@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from browser.manager import Manager
 from helpers.exceptions import LinkedInMCPError
 from providers.base import BaseProvider
 from providers.image import ImageProvider
+from config import Settings, setup_logger, delete
 from config.prompts import (
     CONTENT_GENERATION_SYSTEM_PROMPT,
     CONTENT_GENERATION_USER_PROMPT_TEMPLATE,
 )
 
-logger = logging.getLogger("linkedin-mcp.services.content")
+logger = setup_logger(Settings.LOG_DIR / "content.log", name="linkedin-mcp.services.content")
 
 # ── Image prompt generation prompts ──────────────────────────────────────────
 
@@ -76,7 +75,7 @@ class ContentService:
         if not ("linkedin.com/posts/" in post_url or "linkedin.com/feed/update/" in post_url):
             raise LinkedInMCPError("Invalid LinkedIn post URL provided.")
 
-        logger.info("Targeting post: %s with action: %s", post_url, action)
+        logger.info(f"Targeting post: {post_url} with action: {action}")
 
         try:
             if action == "read":
@@ -94,7 +93,7 @@ class ContentService:
         except LinkedInMCPError:
             raise
         except Exception as exc:
-            logger.error("Post interaction failed: %s", exc)
+            logger.error(f"Post interaction failed: {exc}")
             raise LinkedInMCPError(f"Post interaction failed: {exc}") from exc
 
     # ── AI-Powered Post Creation ─────────────────────────────────────────────
@@ -125,13 +124,13 @@ class ContentService:
             post_preview=post_preview[:300],
         )
 
-        logger.info("Generating image prompt for topic: '%s'", topic[:60])
+        logger.info(f"Generating image prompt for topic: '{topic[:60]}'")
         image_prompt = await self.ai.generate_text(
             system_prompt=_IMAGE_PROMPT_SYSTEM,
             user_prompt=user_prompt,
         )
         image_prompt = image_prompt.strip()
-        logger.info("Image prompt generated (%d chars): %s...", len(image_prompt), image_prompt[:80])
+        logger.info(f"Image prompt generated ({len(image_prompt)} chars)")
         return image_prompt
 
     async def generate_and_submit_post(
@@ -179,12 +178,12 @@ class ContentService:
             cta_instruction=cta_instruction,
         )
 
-        logger.info("Generating LinkedIn post for topic: '%s'", topic[:60])
+        logger.info(f"Generating LinkedIn post for topic: '{topic[:60]}'")
         generated_text = await self.ai.generate_text(
             system_prompt=self._SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        logger.info("Post generated (%d chars).", len(generated_text))
+        logger.info(f"Post generated ({len(generated_text)} chars).")
 
         result: dict[str, Any] = {
             "generated_post": generated_text,
@@ -192,7 +191,7 @@ class ContentService:
             "topic": topic,
         }
 
-        image_path: Path | None = None
+        image_path_obj: Any = None
 
         # ── Step 2 & 3: Generate image (optional) ─────────────────────────
         if include_image:
@@ -210,29 +209,29 @@ class ContentService:
                     result["image_prompt"] = image_prompt
 
                     # Step 3: Generate + download image
-                    image_path = await self.image_provider.generate_and_download(
+                    image_path_obj = await self.image_provider.generate_and_download(
                         prompt=image_prompt,
                         suffix=".png",
                     )
-                    result["image_url"] = f"file://{image_path}"
-                    logger.info("Image ready: %s", image_path)
+                    result["image_url"] = f"file://{image_path_obj}"
+                    logger.info(f"Image ready: {image_path_obj}")
 
                 except Exception as exc:
-                    logger.error("Image generation failed: %s", exc)
+                    logger.error(f"Image generation failed: {exc}")
                     result["image_warning"] = f"Image generation failed: {exc}. Posting text only."
-                    image_path = None
+                    image_path_obj = None
 
         # ── Step 4: Submit to LinkedIn ─────────────────────────────────────
         try:
             browser_result = await self.browser.create_post(
                 text=generated_text,
-                image_path=str(image_path) if image_path and image_path.exists() else None,
+                image_path=str(image_path_obj) if image_path_obj and image_path_obj.exists() else None,
             )
         finally:
             # Always clean up the temp file
-            if image_path and image_path.exists():
+            if image_path_obj and image_path_obj.exists():
                 try:
-                    os.unlink(image_path)
+                    delete(str(image_path_obj))
                 except Exception:
                     pass
 

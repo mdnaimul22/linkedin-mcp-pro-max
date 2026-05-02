@@ -2,27 +2,26 @@ from __future__ import annotations
 
 import itertools
 import json
-import logging
 import shutil
 import tempfile
-from pathlib import Path
+import os
 from typing import Any
 
-from config.settings import get_settings
+from config import Settings, setup_logger, get_settings, ensure_dir
 from helpers import slugify_fragment
 
-logger = logging.getLogger("browser.trace")
+logger = setup_logger(Settings.LOG_DIR / "browser_trace.log", name="browser.trace")
 
 _TRACE_COUNTER = itertools.count(1)
-_TRACE_DIR: Path | None = None
+_TRACE_DIR: Any | None = None
 _TRACE_KEEP = False
 _EXPLICIT_TRACE_DIR = False
 
 
-def _trace_root(auth_root: Path) -> Path:
+def _trace_root(auth_root: Any) -> Any:
     """Return the root directory for trace runs."""
     root = auth_root / "trace-runs"
-    root.mkdir(parents=True, exist_ok=True)
+    ensure_dir(str(root))
     return root
 
 
@@ -32,7 +31,7 @@ def trace_enabled() -> bool:
     return bool(settings.debug_trace_dir) or settings.trace_mode != "off"
 
 
-def get_trace_dir(auth_root: Path) -> Path | None:
+def get_trace_dir(auth_root: Any) -> Any | None:
     """Return the current active trace directory, creating one if needed."""
     global _TRACE_DIR, _EXPLICIT_TRACE_DIR
 
@@ -40,25 +39,25 @@ def get_trace_dir(auth_root: Path) -> Path | None:
     if settings.debug_trace_dir:
         _EXPLICIT_TRACE_DIR = True
         if _TRACE_DIR is None:
-            _TRACE_DIR = settings.debug_trace_dir.expanduser().resolve()
+            _TRACE_DIR = settings.debug_trace_dir
         return _TRACE_DIR
 
     if settings.trace_mode == "off":
         return None
 
     if _TRACE_DIR is None:
-        _TRACE_DIR = Path(
-            tempfile.mkdtemp(prefix="run-", dir=_trace_root(auth_root))
-        ).resolve()
+        root_path = _trace_root(auth_root)
+        tmp_dir = tempfile.mkdtemp(prefix="run-", dir=str(root_path))
+        _TRACE_DIR = settings.resolve_path(tmp_dir).resolve()
     return _TRACE_DIR
 
 
-def mark_trace_for_retention(auth_root: Path) -> Path | None:
+def mark_trace_for_retention(auth_root: Any) -> Any | None:
     """Signal that the current trace should be preserved even on success."""
     global _TRACE_KEEP
     trace_dir = get_trace_dir(auth_root)
     if trace_dir is not None:
-        trace_dir.mkdir(parents=True, exist_ok=True)
+        ensure_dir(str(trace_dir))
         _TRACE_KEEP = True
     return trace_dir
 
@@ -77,10 +76,10 @@ def cleanup_trace_dir() -> None:
     if trace_dir is None or should_keep_traces():
         return
     try:
-        shutil.rmtree(trace_dir)
+        shutil.rmtree(str(trace_dir))
         _TRACE_DIR = None
     except OSError as exc:
-        logger.debug("Could not cleanup trace dir %s: %s", trace_dir, exc)
+        logger.debug(f"Could not cleanup trace dir {trace_dir}: {exc}")
 
     _TRACE_KEEP = False
     _EXPLICIT_TRACE_DIR = False
@@ -96,16 +95,16 @@ def reset_trace_state_for_testing() -> None:
 
 
 async def record_page_trace(
-    page: Any, step: str, auth_root: Path, *, extra: dict[str, Any] | None = None
+    page: Any, step: str, auth_root: Any, *, extra: dict[str, Any] | None = None
 ) -> None:
     """Persist a screenshot and basic page state when trace capture is enabled."""
     trace_dir = get_trace_dir(auth_root)
     if trace_dir is None:
         return
 
-    trace_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(str(trace_dir))
     screenshot_dir = trace_dir / "screens"
-    screenshot_dir.mkdir(parents=True, exist_ok=True)
+    ensure_dir(str(screenshot_dir))
     step_id = next(_TRACE_COUNTER)
     slug = slugify_fragment(step) or "step"
 
@@ -161,5 +160,8 @@ async def record_page_trace(
         "extra": extra or {},
     }
 
-    with (trace_dir / "trace.jsonl").open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    try:
+        with open(trace_dir / "trace.jsonl", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception as exc:
+        logger.error(f"Failed to write trace log: {exc}")

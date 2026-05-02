@@ -1,12 +1,10 @@
 import asyncio
 import json
-import logging
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-
+from config import Settings, setup_logger, ensure_dir
 from providers.base import BaseProvider
 from schema import CoverLetterContent, GeneratedDocument
 from services.helpers import convert_html_to_markdown, convert_html_to_pdf
@@ -14,7 +12,7 @@ from services.jobs import JobSearchService
 from services.profile import ProfileService
 from services.template import TemplateManager
 
-logger = logging.getLogger("linkedin-mcp.services.cover_letter")
+logger = setup_logger(Settings.LOG_DIR / "cover_letter_gen.log", name="linkedin-mcp.services.cover_letter")
 
 
 class CoverLetterGeneratorService:
@@ -26,14 +24,18 @@ class CoverLetterGeneratorService:
         job_service: JobSearchService,
         ai_provider: BaseProvider | None,
         template_manager: TemplateManager,
-        output_dir: Path,
+        output_dir: Any,  # Expected as Path from Settings
     ) -> None:
         self._profiles = profile_service
         self._jobs = job_service
         self._ai = ai_provider
         self._templates = template_manager
         self._output_dir = output_dir
-        self._output_dir.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            ensure_dir(str(self._output_dir))
+        except Exception as e:
+            logger.error(f"Failed to ensure output directory {self._output_dir}: {e}")
 
     def list_templates(self) -> dict[str, str]:
         """List available cover letter templates."""
@@ -47,6 +49,7 @@ class CoverLetterGeneratorService:
         output_format: str = "html",
     ) -> GeneratedDocument:
         """Generate a personalized cover letter for a job."""
+        logger.info(f"Generating cover letter for profile: {profile_id} to job: {job_id} [format={output_format}]")
         profile = await self._profiles.get_profile(profile_id)
         job = await self._jobs.get_job_details(job_id)
 
@@ -72,7 +75,7 @@ class CoverLetterGeneratorService:
                     ),
                 )
             except Exception as exc:
-                logger.warning("AI generation failed: %s", exc)
+                logger.warning(f"AI cover letter generation failed for {profile_id}: {exc}")
                 content = self._build_basic_content(profile_data, job_data)
         else:
             content = self._build_basic_content(profile_data, job_data)
@@ -174,6 +177,7 @@ Return a JSON object with:
         }
 
         if output_format == "md":
+            logger.info(f"Rendering cover letter as Markdown for {profile_id}")
             return GeneratedDocument(
                 content=convert_html_to_markdown(html), format="md", metadata=metadata
             )
@@ -182,6 +186,7 @@ Return a JSON object with:
             safe_job = re.sub(r"[^\w\-]", "_", job_id)
             filename = f"cover_letter_{safe_profile}_{safe_job}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             output_path = self._output_dir / filename
+            logger.info(f"Rendering cover letter as PDF for {profile_id} at {output_path}")
             await asyncio.to_thread(convert_html_to_pdf, html, output_path)
             return GeneratedDocument(
                 content=f"PDF: {output_path}",
@@ -199,5 +204,5 @@ SERVICE = ServiceMeta(
     attr="cover_letter_gen",
     cls=CoverLetterGeneratorService,
     lazy=True,
-    factory=lambda ctx: CoverLetterGeneratorService(ctx.profiles, ctx.jobs, ctx.ai, ctx.template_manager, ctx.settings.data_dir / 'cover_letters'),
+    factory=lambda ctx: CoverLetterGeneratorService(ctx.profiles, ctx.jobs, ctx.ai, ctx.template_manager, ctx.settings.DATA_DIR / 'cover_letters'),
 )

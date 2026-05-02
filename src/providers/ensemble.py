@@ -3,13 +3,13 @@ Model ensemble for LLMs
 """
 
 import asyncio
-import logging
 import random
 from typing import List, Optional
 
 from providers.base import BaseProvider
+from config import Settings, setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(Settings.LOG_DIR / "providers.log", name="linkedin-mcp.providers.ensemble")
 
 
 class EnsembleProvider(BaseProvider):

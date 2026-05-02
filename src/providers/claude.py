@@ -1,11 +1,11 @@
 """Anthropic Claude AI provider for content generation."""
 
-import logging
-
+from typing import Any, Dict, List, Optional
 from providers.base import BaseProvider
 from helpers.exceptions import AIProviderError
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp.ai")
+logger = setup_logger(Settings.LOG_DIR / "claude_provider.log", name="linkedin-mcp.ai")
 
 
 class ClaudeProvider(BaseProvider):

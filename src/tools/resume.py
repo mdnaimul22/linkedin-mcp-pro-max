@@ -1,11 +1,10 @@
 import json
-import logging
 from fastmcp.exceptions import ToolError
 from app import get_ctx, mcp
 from helpers.exceptions import LinkedInMCPError
+from config import Settings, setup_logger
 
-
-logger = logging.getLogger("linkedin-mcp.tools.resume")
+logger = setup_logger(Settings.LOG_DIR / "resume_tool.log", name="linkedin-mcp.tools.resume")
 
 _VALID_FORMATS = {"html", "md", "pdf"}
 

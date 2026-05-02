@@ -1,9 +1,8 @@
 import json
-import logging
 from app import get_ctx, mcp
+from config import Settings, setup_logger
 
-
-logger = logging.getLogger("linkedin-mcp.tools.resources")
+logger = setup_logger(Settings.LOG_DIR / "resources_tool.log", name="linkedin-mcp.tools.resources")
 
 
 @mcp.resource("linkedin://profile/{profile_id}")

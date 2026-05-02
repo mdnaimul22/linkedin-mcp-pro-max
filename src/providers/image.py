@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import logging
 import mimetypes
 import tempfile
-from pathlib import Path
+import asyncio
+from typing import Any
 
 from helpers.exceptions import AIProviderError
+from config import Settings, setup_logger, ensure_dir
 
-logger = logging.getLogger("linkedin-mcp.providers.image")
+logger = setup_logger(Settings.LOG_DIR / "image_provider.log", name="linkedin-mcp.providers.image")
 
 
 class ImageProvider:
@@ -48,8 +49,8 @@ class ImageProvider:
         self,
         prompt: str,
         suffix: str = ".png",
-        directory: str | Path | None = None,
-    ) -> Path:
+        directory: Any | None = None,
+    ) -> Any:
         """
         Generate an image via Gemini and save it to a local file.
 
@@ -76,8 +77,7 @@ class ImageProvider:
         from google.genai import types
 
         logger.info(
-            "Generating image via Gemini (model=%s, prompt_len=%d)",
-            self._model, len(prompt),
+            f"Generating image via Gemini (model={self._model}, prompt_len={len(prompt)})"
         )
 
         config = types.GenerateContentConfig(
@@ -92,7 +92,6 @@ class ImageProvider:
         ]
 
         # Use synchronous streaming in an async context via run_in_executor
-        import asyncio
         loop = asyncio.get_event_loop()
 
         try:
@@ -110,17 +109,18 @@ class ImageProvider:
             suffix = detected_ext
 
         # Save to file
-        dir_path = Path(directory) if directory else Path(tempfile.gettempdir())
-        dir_path.mkdir(parents=True, exist_ok=True)
+        dir_path = directory if directory else Settings.CACHE_DIR / "images"
+        ensure_dir(str(dir_path))
 
         tmp = tempfile.NamedTemporaryFile(
-            delete=False, suffix=suffix, dir=dir_path,
+            delete=False, suffix=suffix, dir=str(dir_path),
         )
         tmp.write(image_data)
         tmp.close()
 
-        image_path = Path(tmp.name)
-        logger.info("Image saved to: %s (%d KB)", image_path, len(image_data) // 1024)
+        # tmp.name is an absolute path string
+        image_path = dir_path / tmp.name.rsplit("/", 1)[-1]
+        logger.info(f"Image saved to: {image_path} ({len(image_data) // 1024} KB)")
         return image_path
 
     def _generate_sync(self, client, contents, config):
@@ -141,9 +141,9 @@ class ImageProvider:
                     image_data = part.inline_data.data
                     mime = part.inline_data.mime_type
                     detected_ext = mimetypes.guess_extension(mime) or ".png"
-                    logger.info("Received image data (%s, %d bytes)", mime, len(image_data))
+                    logger.info(f"Received image data ({mime}, {len(image_data)} bytes)")
                 elif part.text:
-                    logger.info("Gemini text response: %s", part.text[:100])
+                    logger.info(f"Gemini text response: {part.text[:100]}")
 
         if not image_data:
             raise AIProviderError("Gemini returned no image data. The model may not support image generation for this prompt.")

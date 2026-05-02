@@ -1,38 +1,46 @@
-import logging
-from pathlib import Path
 from typing import Any
-
 from jinja2 import FileSystemLoader, select_autoescape
 from jinja2.sandbox import SandboxedEnvironment
 
-from config.settings import get_settings
+from config import Settings, setup_logger, ensure_dir, exists
 from helpers.exceptions import TemplateError
 
-logger = logging.getLogger("linkedin-mcp.services.template")
+logger = setup_logger(Settings.LOG_DIR / "template.log", name="linkedin-mcp.services.template")
 
 
 class TemplateManager:
     """Manages Jinja2 templates for resume and cover letter generation."""
 
     def __init__(self, template_dirs: list[str] | None = None) -> None:
-        settings = get_settings()
+        # Templates are loaded from Settings.TEMPLATES_DIR (internal) 
+        # and Settings.DATA_DIR / "templates" (user customized)
+        
+        internal_templates = Settings.TEMPLATES_DIR
+        user_templates = Settings.DATA_DIR / "templates"
 
-        # Internal templates are two levels up from services/ → src/templates/
-        internal_templates = Path(__file__).parent.parent / "templates"
-        user_templates = settings.data_dir / "templates"
-
-        self.template_dirs = [Path(d) for d in (template_dirs or [])] + [
+        # template_dirs coming as strings from external calls if any
+        custom_dirs = []
+        for d in (template_dirs or []):
+            try:
+                custom_dirs.append(Settings.resolve_path(d))
+            except Exception:
+                pass
+        
+        self.template_dirs = custom_dirs + [
             internal_templates,
             user_templates,
         ]
 
         try:
-            user_templates.mkdir(parents=True, exist_ok=True)
-        except OSError:
-            pass
+            ensure_dir(str(user_templates))
+        except Exception as exc:
+            logger.warning(f"Could not create user templates directory: {exc}")
 
+        # Filter only existing directories for FileSystemLoader
+        valid_dirs = [str(d) for d in self.template_dirs if d.exists()]
+        
         self.env = SandboxedEnvironment(
-            loader=FileSystemLoader([str(d) for d in self.template_dirs if d.exists()]),
+            loader=FileSystemLoader(valid_dirs),
             autoescape=select_autoescape(["html", "xml"]),
             trim_blocks=True,
             lstrip_blocks=True,
@@ -47,6 +55,7 @@ class TemplateManager:
             type_dir = template_dir / template_type
             if not type_dir.exists():
                 continue
+            # glob returns Path objects, we use .stem
             for template_file in type_dir.glob("*.j2"):
                 name = template_file.stem
                 templates[name] = name.replace("_", " ").title()
@@ -68,7 +77,7 @@ class TemplateManager:
                 rendered = "\n".join(line.rstrip() for line in rendered.split("\n"))
             return rendered
         except Exception as exc:
-            logger.error("Error rendering template %s: %s", template_path, exc)
+            logger.error(f"Error rendering template {template_path}: {exc}")
             raise TemplateError(
                 f"Error rendering template {template_path}: {exc}"
             ) from exc

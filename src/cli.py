@@ -3,34 +3,26 @@ LinkedIn MCP Pro Max - CLI Entry Point
 This script handles configuration, authentication commands, and starts the server.
 """
 
-import logging
-import argparse
+import os
 import sys
+
+# Silence third-party stdout pollution (e.g. fastmcp update checks and banner)
+# These MUST be set before FastMCP is imported via 'app'
+os.environ["FAST_MCP_CHECK_UPDATES"] = "0"
+os.environ["FAST_MCP_BANNER"] = "0"
+
+import argparse
 import asyncio
 import threading
-from pathlib import Path
 
 from app import mcp, run_session_commands
-from config.settings import get_settings, set_settings
-
+from config import Settings, setup_logger, set_settings
 
 def main():
     """Configure environment and execute the LinkedIn MCP Pro Max service."""
     
-    # Initial basic logging setup
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        stream=sys.stderr,
-    )
-    
-    settings = get_settings()
-
-    # Apply log level from environment/config
-    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-    logging.getLogger().setLevel(log_level)
-
-    logger = logging.getLogger("linkedin-mcp-pro-max.main")
+    # Initialize unified logger
+    logger = setup_logger(Settings.LOG_DIR / "main.log", name="linkedin-mcp-pro-max.main")
 
     # Command Line Interface Setup
     parser = argparse.ArgumentParser(
@@ -93,18 +85,18 @@ Examples:
         updates["cdp_url"] = args.cdp_url
 
     # Update global settings singleton
-    settings = settings.model_copy(update=updates)
-    set_settings(settings)
+    global_settings = Settings.model_copy(update=updates)
+    set_settings(global_settings)
 
     # Validate essential configuration
-    errors = settings.validate_config()
+    errors = global_settings.validate_config()
     if errors:
         logger.warning(f"Configuration advisory: {', '.join(errors)}")
 
     # Execute session-specific commands if requested
-    if any([settings.login, settings.status, settings.logout]):
+    if any([global_settings.login, global_settings.status, global_settings.logout]):
         logger.info("Executing lifecycle command...")
-        was_session_cmd = asyncio.run(run_session_commands(settings))
+        was_session_cmd = asyncio.run(run_session_commands(global_settings))
         if was_session_cmd:
             return
 
@@ -116,20 +108,19 @@ Examples:
             from watchfiles import watch
             
             def run_watcher(src_dir: str):
-                watcher_logger = logging.getLogger("linkedin-mcp.watcher")
+                watcher_logger = setup_logger(Settings.LOG_DIR / "watcher.log", name="linkedin-mcp.watcher")
                 watcher_logger.info(f"Auto-reload enabled: Watching {src_dir} for changes...")
                 for changes in watch(src_dir):
                     watcher_logger.info(f"Detected changes: {changes}. Restarting server...")
                     sys.exit(0)
                     
-            src_path = str(Path(__file__).parent.absolute())
+            src_path = os.path.dirname(os.path.abspath(__file__))
             threading.Thread(target=run_watcher, args=(src_path,), daemon=True).start()
         except ImportError:
             logger.error("watchfiles is not installed. Run 'uv pip install watchfiles'")
             
-    mcp.run()
+    mcp.run(show_banner=False, log_level="WARNING")
 
 
 if __name__ == "__main__":
     main()
-

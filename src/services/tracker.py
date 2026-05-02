@@ -1,29 +1,29 @@
 import asyncio
 import json
-import logging
 import os
 import tempfile
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from schema import StatusType, TrackedApplication
 from helpers import sanitize_filename
+from config import Settings, setup_logger, exists, delete
 
-logger = logging.getLogger("linkedin-mcp.services.tracker")
+logger = setup_logger(Settings.LOG_DIR / "tracker_service.log", name="linkedin-mcp.services.tracker")
 
 
 class ApplicationTrackerService:
     """Tracks job applications locally via JSON files."""
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Any) -> None:
         self._dir = data_dir / "applications"
         self._dir.mkdir(parents=True, exist_ok=True)
 
-    def _path(self, job_id: str) -> Path:
+    def _path(self, job_id: str) -> Any:
         """Get the path for an application tracking file."""
         safe_id = sanitize_filename(job_id)
         result = self._dir / f"{safe_id}.json"
+        # Since we use Path objects from Settings, .resolve() and .is_relative_to work
         if not result.resolve().is_relative_to(self._dir.resolve()):
             raise ValueError(f"Invalid job ID for path: {job_id}")
         return result
@@ -41,9 +41,11 @@ class ApplicationTrackerService:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     json.dump(application.model_dump(), f, indent=2, default=str)
                 os.replace(tmp_path, str(path))
-            except Exception:
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+                logger.info(f"Tracked application saved: {application.job_id}")
+            except Exception as exc:
+                if exists(tmp_path):
+                    delete(tmp_path)
+                logger.error(f"Failed to write application {application.job_id}: {exc}")
                 raise
 
         await asyncio.to_thread(_write)
@@ -58,7 +60,8 @@ class ApplicationTrackerService:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except Exception as exc:
+                logger.debug(f"Failed to read application {job_id}: {exc}")
                 return None
 
         data = await asyncio.to_thread(_read)
@@ -69,6 +72,10 @@ class ApplicationTrackerService:
     ) -> list[TrackedApplication]:
         def _list() -> list[dict[str, Any]]:
             results: list[dict[str, Any]] = []
+            if not self._dir.exists():
+                return results
+            
+            # glob returns Path objects, we use .stat()
             for f in sorted(
                 self._dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
             ):
@@ -108,5 +115,5 @@ SERVICE = ServiceMeta(
     attr="tracker",
     cls=ApplicationTrackerService,
     lazy=False,
-    factory=lambda ctx: ApplicationTrackerService(ctx.settings.data_dir),
+    factory=lambda ctx: ApplicationTrackerService(ctx.settings.DATA_DIR),
 )

@@ -9,14 +9,14 @@ Example URLs:
 """
 
 import asyncio
-import logging
 from typing import Any, Optional
 
 from bs4 import BeautifulSoup, Tag
 from patchright.async_api import Page
 from schema import FieldInfo, DiscoveryResult
+from config import Settings, setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(Settings.LOG_DIR / "browser_executor.log", name="linkedin-mcp.browser.executor")
 
 
 
@@ -90,19 +90,19 @@ class ApiExecutor:
 
     async def execute(self, url: str) -> DiscoveryResult:
         """Navigate to a URL and return a structured map of all discovered input fields."""
-        logger.info("Field Discovery Engine: navigating to %s", url)
+        logger.info(f"Field Discovery Engine: navigating to {url}")
         try:
             await self._page.goto(url, wait_until="domcontentloaded", timeout=60_000)
             await asyncio.sleep(_PAGE_LOAD_SETTLE_SECONDS)
             return await self.discover(url)
         except Exception as exc:
-            logger.error("Field discovery failed at %s: %s", url, exc)
+            logger.error(f"Field discovery failed at {url}: {exc}")
             return DiscoveryResult(url=url, success=False, error=str(exc))
 
     async def discover(self, url: Optional[str] = None) -> DiscoveryResult:
         """Analyze the current page and return a structured map of all discovered input fields."""
         current_url = url or self._page.url
-        logger.info("Field Discovery Engine: analyzing current page %s", current_url)
+        logger.info(f"Field Discovery Engine: analyzing current page {current_url}")
 
         try:
             html = await self._page.content()
@@ -126,7 +126,7 @@ class ApiExecutor:
             return result
 
         except Exception as exc:
-            logger.error("Field discovery failed: %s", exc)
+            logger.error(f"Field discovery failed: {exc}")
             return DiscoveryResult(url=current_url, success=False, error=str(exc))
 
     # --- Robust Automation & Self-Healing Methods ---

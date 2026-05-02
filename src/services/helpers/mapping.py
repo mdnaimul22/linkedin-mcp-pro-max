@@ -1,13 +1,12 @@
-import logging
 from typing import Any
-
 from schema import (
     CompanyInfo,
     Profile,
     JobDetails,
 )
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp.services.helpers.mapping")
+logger = setup_logger(Settings.LOG_DIR / "mapping.log", name="linkedin-mcp.services.helpers.mapping")
 
 
 def map_profile_api(

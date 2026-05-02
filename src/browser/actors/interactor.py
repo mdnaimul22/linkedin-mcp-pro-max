@@ -1,10 +1,10 @@
 import asyncio
-import logging
 from typing import Dict, Any, Optional
 from patchright.async_api import Page
 from browser.helpers.executor import ApiExecutor
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp.browser.actors.interactor")
+logger = setup_logger(Settings.LOG_DIR / "content_interactor.log", name="linkedin-mcp.browser.actors.interactor")
 
 class ContentInteractor:
     """
@@ -147,7 +147,8 @@ class ContentInteractor:
 
         except Exception as e:
             logger.error(f"Semantic post creation failed: {e}")
-            await self.page.screenshot(path="semantic_post_failure.png")
+            failure_path = Settings.LOG_DIR / "semantic_post_failure.png"
+            await self.page.screenshot(path=str(failure_path))
             return {"status": "error", "message": str(e)}
 
 # ── Registry Convention ───────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+from config import Settings, setup_logger
 
 from browser import (
     Manager,
@@ -11,7 +11,7 @@ from browser import (
 )
 from browser.session import Session
 
-logger = logging.getLogger("linkedin-mcp.services.auth")
+logger = setup_logger(Settings.LOG_DIR / "auth_service.log", name="linkedin-mcp.services.auth")
 
 
 class AuthResolver:

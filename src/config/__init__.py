@@ -1,19 +1,18 @@
-"""
-Configuration system for LinkedIn MCP Server.
-
-Provides a unified settings management using Pydantic BaseSettings.
-"""
-
-import logging
-
+from .paths import PROJECT_ROOT, find_project_root
+from .files import (
+    read_text, write_text, read_json, write_json,
+    exists, ensure_dir, delete, list_files, get_abs_path,
+)
+from .dotenv import load_dotenv, set_value, get_value, remove_value
 from .settings import Settings, get_settings, set_settings
-from . import prompts
+from .logger import setup_logger
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
 __all__ = [
-    "Settings",
-    "get_settings",
-    "set_settings",
-    "prompts",
+    "PROJECT_ROOT", "find_project_root",
+    "read_text", "write_text", "read_json", "write_json",
+    "exists", "ensure_dir", "delete", "list_files", "get_abs_path",
+    "load_dotenv", "set_value", "get_value", "remove_value",
+    "Settings", "get_settings", "set_settings", "setup_logger",
 ]

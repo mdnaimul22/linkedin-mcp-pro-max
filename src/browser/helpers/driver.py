@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import logging
-from pathlib import Path
+import os
 from typing import Any
 
 from patchright.async_api import (
@@ -12,8 +11,9 @@ from patchright.async_api import (
 )
 
 from helpers.exceptions import NetworkError
+from config import Settings, setup_logger
 
-logger = logging.getLogger("browser.driver")
+logger = setup_logger(Settings.LOG_DIR / "browser_driver.log", name="browser.driver")
 
 
 class BrowserDriver:
@@ -24,7 +24,7 @@ class BrowserDriver:
 
     def __init__(
         self,
-        user_data_dir: str | Path,
+        user_data_dir: str | Any,
         headless: bool = True,
         slow_mo: int = 0,
         viewport: ViewportSize | None = None,
@@ -33,7 +33,7 @@ class BrowserDriver:
         cdp_url: str | None = None,
         **launch_options: Any,
     ) -> None:
-        self.user_data_dir = str(Path(user_data_dir).expanduser())
+        self.user_data_dir = str(user_data_dir)
         self.headless = headless
         self.slow_mo = slow_mo
         self.viewport: ViewportSize | None = viewport or ViewportSize(
@@ -56,7 +56,7 @@ class BrowserDriver:
             self._playwright = await async_playwright().start()
 
             if self.cdp_url:
-                logger.info("Connecting to system browser via CDP: %s", self.cdp_url)
+                logger.info(f"Connecting to system browser via CDP: {self.cdp_url}")
                 browser = await self._playwright.chromium.connect_over_cdp(self.cdp_url)
                 if not browser.contexts:
                     self._context = await browser.new_context(
@@ -69,7 +69,7 @@ class BrowserDriver:
                 return self._context
 
             # Ensure the user data directory exists with restrictive permissions
-            Path(self.user_data_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
+            os.makedirs(self.user_data_dir, mode=0o700, exist_ok=True)
 
             context_options: dict[str, Any] = {
                 "headless": self.headless,
@@ -87,9 +87,7 @@ class BrowserDriver:
                 **context_options,
             )
             logger.info(
-                "Stealth browser launched (headless=%s, user_data_dir=%s)",
-                self.headless,
-                self.user_data_dir,
+                f"Stealth browser launched (headless={self.headless}, user_data_dir={self.user_data_dir})"
             )
             return self._context
 
@@ -103,20 +101,20 @@ class BrowserDriver:
             try:
                 await self._context.close()
             except Exception as exc:
-                logger.debug("Error closing context: %s", exc)
+                logger.debug(f"Error closing context: {exc}")
             self._context = None
 
         if self._playwright:
             try:
                 await self._playwright.stop()
             except Exception as exc:
-                logger.debug("Error stopping playwright: %s", exc)
+                logger.debug(f"Error stopping playwright: {exc}")
             self._playwright = None
 
         logger.info("Browser stopped")
 
     async def export_storage_state(
-        self, path: str | Path, indexed_db: bool = True
+        self, path: str | Any, indexed_db: bool = True
     ) -> bool:
         """Export full browser storage state (cookies + localStorage) to a JSON file."""
         if not self._context:
@@ -125,5 +123,5 @@ class BrowserDriver:
             await self._context.storage_state(path=str(path), indexed_db=indexed_db)
             return True
         except Exception as exc:
-            logger.error("Failed to export storage state: %s", exc)
+            logger.error(f"Failed to export storage state: {exc}")
             return False

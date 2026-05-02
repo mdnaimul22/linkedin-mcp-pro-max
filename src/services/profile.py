@@ -1,14 +1,13 @@
-import logging
 from typing import Optional
 
 from schema import Profile, CompanyInfo
 from providers.linkedin import LinkedInClient
 from browser.manager import Manager
-from config.settings import get_settings
+from config import Settings, setup_logger
 from helpers.exceptions import LinkedInMCPError
 from services.helpers.mapping import map_profile_browser
 
-logger = logging.getLogger("linkedin-mcp.services.profile")
+logger = setup_logger(Settings.LOG_DIR / "profile_service.log", name="linkedin-mcp.services.profile")
 
 
 class ProfileService:
@@ -45,12 +44,11 @@ class ProfileService:
                 resolved_id = await self._browser.get_current_profile_id()
                 if resolved_id:
                     return resolved_id
-            except Exception:
-                logger.debug("Failed to resolve profile ID via browser")
+            except Exception as exc:
+                logger.debug(f"Failed to resolve profile ID via browser: {exc}")
 
         # 2. Fallback to settings
-        settings = get_settings()
-        resolved_id = settings.linkedin_username or settings.linkedin_email
+        resolved_id = Settings.linkedin_username or Settings.linkedin_email
         
         if not resolved_id:
             raise LinkedInMCPError(
@@ -69,16 +67,18 @@ class ProfileService:
         target_id = await self.resolve_profile_id(profile_id)
         profile: Profile | None = None
 
+        logger.info(f"Fetching profile: {target_id}")
+
         # 1. API Fetch
         try:
             profile = await self._client.get_profile(target_id)
         except Exception as exc:
-            logger.warning("API fetch failed for %s: %s", target_id, exc)
+            logger.warning(f"API fetch failed for {target_id}: {exc}")
 
         # 2. Browser Enrichment (if API failed or returned thin data)
         is_thin = not profile or not profile.skills or not profile.experience
         if is_thin and use_browser_fallback and self._browser:
-            logger.info("Attempting high-fidelity browser scraping for %s", target_id)
+            logger.info(f"Attempting high-fidelity browser scraping for {target_id}")
             try:
                 raw_data = await self._browser.scrape_profile_by_id(target_id)
                 browser_profile = map_profile_browser(target_id, raw_data)
@@ -100,15 +100,17 @@ class ProfileService:
                 else:
                     profile = browser_profile
             except Exception as exc:
-                logger.error("Browser enrichment failed: %s", exc)
+                logger.error(f"Browser enrichment failed for {target_id}: {exc}")
 
         if not profile:
+            logger.error(f"Failed to retrieve profile {target_id} from all sources.")
             raise ValueError(f"Could not retrieve profile {target_id} from any source.")
 
         return profile
 
     async def get_company(self, company_id: str) -> CompanyInfo:
         """Get company info from the LinkedIn API."""
+        logger.info(f"Fetching company info: {company_id}")
         return await self._client.get_company(company_id)
 
 

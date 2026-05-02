@@ -1,8 +1,6 @@
 from __future__ import annotations
-import logging
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 from patchright.async_api import BrowserContext, Page, ViewportSize
@@ -11,8 +9,9 @@ from browser.helpers import stabilize_navigation
 from browser.actors.auth import validate_linkedin_auth, export_linkedin_cookies
 from helpers.exceptions import AuthenticationError
 from schema import SourceState
+from config import Settings, setup_logger, exists
 
-logger = logging.getLogger("browser.manager")
+logger = setup_logger(Settings.LOG_DIR / "browser_manager.log", name="browser.manager")
 
 
 class Manager:
@@ -47,9 +46,7 @@ class Manager:
             self._scraper_classes[meta.attr] = meta.cls
 
         logger.info(
-            "Browser manager ready — %d actor(s), %d scraper(s) registered for lazy-loading.",
-            len(self._actor_classes),
-            len(self._scraper_classes),
+            f"Browser manager ready — {len(self._actor_classes)} actor(s), {len(self._scraper_classes)} scraper(s) registered for lazy-loading."
         )
 
     async def close(self) -> None:
@@ -107,7 +104,7 @@ class Manager:
                 raise RuntimeError(f"Cannot instantiate actor '{name}' before browser start.")
             actor = actor_classes[name](page)
             actors[name] = actor
-            logger.debug("Lazy-loaded actor: %s", name)
+            logger.debug(f"Lazy-loaded actor: {name}")
             return actor
 
         if name in scraper_classes:
@@ -121,7 +118,7 @@ class Manager:
                 scraper.api_executor = api_executor
                 
             scrapers[name] = scraper
-            logger.debug("Lazy-loaded scraper: %s", name)
+            logger.debug(f"Lazy-loaded scraper: {name}")
             return scraper
 
         raise AttributeError(
@@ -141,12 +138,12 @@ class Manager:
         logger.info("Resolving current profile ID...")
 
         if self.sessions.settings.linkedin_username:
-            logger.debug("Using username as profile ID from settings: %s", self.sessions.settings.linkedin_username)
+            logger.debug(f"Using username as profile ID from settings: {self.sessions.settings.linkedin_username}")
             self._cached_profile_id = self.sessions.settings.linkedin_username
             return self._cached_profile_id
 
         if self.sessions.settings.linkedin_email and "@" not in self.sessions.settings.linkedin_email:
-            logger.debug("Using email field as profile ID from settings: %s", self.sessions.settings.linkedin_email)
+            logger.debug(f"Using email field as profile ID from settings: {self.sessions.settings.linkedin_email}")
             self._cached_profile_id = self.sessions.settings.linkedin_email
             return self._cached_profile_id
 
@@ -158,14 +155,14 @@ class Manager:
             try:
                 await temp_page.wait_for_url("**/in/**", timeout=15000)
             except Exception:
-                logger.debug("URL after /me navigation: %s", temp_page.url)
+                logger.debug(f"URL after /me navigation: {temp_page.url}")
 
             match = re.search(r"linkedin\.com/in/([^/?#]+)", temp_page.url)
             await temp_page.close()
             
             if match:
                 slug = match.group(1)
-                logger.info("Resolved current profile ID: %s", slug)
+                logger.info(f"Resolved current profile ID: {slug}")
                 self._cached_profile_id = slug
                 return slug
         except Exception as e:
@@ -177,12 +174,13 @@ class Manager:
 
         raise AuthenticationError("Could not resolve profile ID and no LINKEDIN_USERNAME in settings.")
 
-    async def export_cookies(self, path: Path | None = None) -> bool:
+    async def export_cookies(self, path: Any | None = None) -> bool:
         target = path or self.sessions.portable_cookies_path
         return await export_linkedin_cookies(self._context, target)
 
-    async def import_cookies(self, path: Path | None = None) -> bool:
+    async def import_cookies(self, path: Any | None = None) -> bool:
         target = path or self.sessions.portable_cookies_path
+        # target is expected to be a Path-like object from session manager
         if not target.exists():
             return False
         try:
@@ -253,8 +251,8 @@ class Manager:
         await stabilize_navigation(self.page)
         return await self.content_interactor.comment_on_post(text)
 
-    async def create_post(self, text: str) -> dict[str, Any]:
-        return await self.content_interactor.create_post(text)
+    async def create_post(self, text: str, image_path: str | None = None) -> dict[str, Any]:
+        return await self.content_interactor.create_post(text, image_path=image_path)
 
 
 async def create_browser(
@@ -315,7 +313,8 @@ async def create_browser(
     if (
         runtime_state
         and runtime_state.source_login_generation == source_state.login_generation
-        and Path(runtime_state.profile_path).exists()
+        # runtime_state.profile_path is a string but we can check existence via os.path
+        and exists(runtime_state.profile_path)
     ):
         driver = BrowserDriver(
             user_data_dir=runtime_state.profile_path,
@@ -343,6 +342,7 @@ async def create_browser(
     mgr.is_authenticated = True
     return mgr
 
+import os
 
 async def _bridge_linkedin_session(
     sessions: Any,

@@ -1,11 +1,11 @@
 import json
-import logging
+from typing import Literal, Optional
 from fastmcp.exceptions import ToolError
 from app import get_ctx, mcp
 from helpers.exceptions import LinkedInMCPError
-from typing import Literal
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp.tools.profiles")
+logger = setup_logger(Settings.LOG_DIR / "profiles_tool.log", name="linkedin-mcp.tools.profiles")
 
 
 @mcp.tool()

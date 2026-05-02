@@ -1,16 +1,14 @@
 import json
-import logging
 import platform
 import shutil
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from config.settings import Settings
+from config import Settings, setup_logger, exists
 from helpers import secure_write_text, utcnow_iso
 from schema import RuntimeState, SourceState
 
-logger = logging.getLogger("browser.session")
+logger = setup_logger(Settings.LOG_DIR / "browser_session.log", name="browser.session")
 
 
 class Session:
@@ -25,46 +23,48 @@ class Session:
         return self._runtime_id
 
     @property
-    def auth_root(self) -> Path:
+    def auth_root(self) -> Any:
         """Root directory for all auth-related files."""
-        return self.settings.user_data_dir.parent
+        return self.settings.USER_DATA_DIR.parent
 
     @property
-    def source_profile_dir(self) -> Path:
+    def source_profile_dir(self) -> Any:
         """Primary browser profile directory (where the user logs in)."""
-        return self.settings.user_data_dir
+        return self.settings.USER_DATA_DIR
 
     @property
-    def source_state_path(self) -> Path:
+    def source_state_path(self) -> Any:
         """Metadata file path for the primary authenticated profile."""
         return self.auth_root / "source-state.json"
 
     @property
-    def portable_cookies_path(self) -> Path:
+    def portable_cookies_path(self) -> Any:
         """Portable cookies file (used for multi-environment bridging)."""
         return self.auth_root / "cookies.json"
 
     @property
-    def runtimes_root(self) -> Path:
+    def runtimes_root(self) -> Any:
         """Root directory for all derived runtime profiles."""
         return self.auth_root / "runtimes"
 
-    def get_runtime_dir(self, runtime_id: str) -> Path:
+    def get_runtime_dir(self, runtime_id: str) -> Any:
         return self.runtimes_root / runtime_id
 
-    def get_runtime_profile_dir(self, runtime_id: str) -> Path:
+    def get_runtime_profile_dir(self, runtime_id: str) -> Any:
         return self.get_runtime_dir(runtime_id) / "profile"
 
-    def get_runtime_state_path(self, runtime_id: str) -> Path:
+    def get_runtime_state_path(self, runtime_id: str) -> Any:
         return self.get_runtime_dir(runtime_id) / "runtime-state.json"
 
-    def get_runtime_storage_state_path(self, runtime_id: str) -> Path:
+    def get_runtime_storage_state_path(self, runtime_id: str) -> Any:
         return self.get_runtime_dir(runtime_id) / "storage-state.json"
 
     def source_profile_exists(self) -> bool:
         """Return True if the source profile directory exists and is non-empty."""
-        path = self.source_profile_dir.expanduser()
-        return path.is_dir() and any(path.iterdir())
+        path = self.source_profile_dir
+        if not path.is_dir():
+            return False
+        return any(path.iterdir())
 
     def load_source_state(self) -> SourceState | None:
         """Load source session metadata from disk."""
@@ -74,12 +74,12 @@ class Session:
         try:
             return SourceState.model_validate(data)
         except Exception as exc:
-            logger.warning("Invalid source-state.json: %s", exc)
+            logger.warning(f"Invalid source-state.json: {exc}")
             return None
 
     def write_source_state(self) -> SourceState:
         """Write a new source session generation record (after successful login)."""
-        profile_path = self.source_profile_dir.expanduser().resolve()
+        profile_path = self.source_profile_dir.resolve()
         state = SourceState(
             version=1,
             source_runtime_id=self.runtime_id,
@@ -89,7 +89,7 @@ class Session:
             cookies_path=str(self.portable_cookies_path),
         )
         self._write_json(self.source_state_path, state.model_dump())
-        logger.debug("Source state written for gen: %s", state.login_generation)
+        logger.debug(f"Source state written for gen: {state.login_generation}")
         return state
 
     def load_runtime_state(self, runtime_id: str | None = None) -> RuntimeState | None:
@@ -101,13 +101,13 @@ class Session:
         try:
             return RuntimeState.model_validate(data)
         except Exception as exc:
-            logger.warning("Invalid runtime-state.json for %s: %s", rid, exc)
+            logger.warning(f"Invalid runtime-state.json for {rid}: {exc}")
             return None
 
     def write_runtime_state(
         self,
         source_state: SourceState,
-        storage_state_path: Path,
+        storage_state_path: Any,
         runtime_id: str | None = None,
         commit_method: str = "checkpoint_restart",
     ) -> RuntimeState:
@@ -140,7 +140,7 @@ class Session:
             shutil.rmtree(target)
             return True
         except OSError as exc:
-            logger.error("Failed to clear runtime %s: %s", rid, exc)
+            logger.error(f"Failed to clear runtime {rid}: {exc}")
             return False
 
     def logout(self) -> bool:
@@ -161,7 +161,7 @@ class Session:
                 else:
                     target.unlink()
             except OSError as exc:
-                logger.error("Failed to clear %s: %s", target, exc)
+                logger.error(f"Failed to clear {target}: {exc}")
                 success = False
         return success
 
@@ -191,30 +191,30 @@ class Session:
     def _is_container() -> bool:
         """Heuristic: detect whether we are running inside a container."""
         for p in ("/run/.containerenv", "/run/containerenv"):
-            if Path(p).exists():
+            if exists(p):
                 return True
         markers = ("docker", "containerd", "kubepods", "podman", "libpod")
         for probe in ("/proc/1/cgroup", "/proc/self/cgroup", "/proc/1/mountinfo"):
             try:
-                path = Path(probe)
-                if path.exists() and any(
-                    m in path.read_text().lower() for m in markers
-                ):
-                    return True
+                if exists(probe):
+                    with open(probe, "r", encoding="utf-8") as f:
+                        content = f.read().lower()
+                        if any(m in content for m in markers):
+                            return True
             except Exception:
                 continue
         return False
 
-    def _load_json(self, path: Path) -> dict[str, Any] | None:
+    def _load_json(self, path: Any) -> dict[str, Any] | None:
         if not path.exists():
             return None
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)  # type: ignore[no-any-return]
         except Exception as exc:
-            logger.debug("Failed to load JSON from %s: %s", path, exc)
+            logger.debug(f"Failed to load JSON from {path}: {exc}")
             return None
 
-    def _write_json(self, path: Path, data: dict[str, Any]) -> None:
+    def _write_json(self, path: Any, data: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         secure_write_text(path, json.dumps(data, indent=2, sort_keys=True) + "\n")

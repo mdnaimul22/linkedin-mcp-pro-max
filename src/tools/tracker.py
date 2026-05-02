@@ -1,13 +1,13 @@
 import json
-import logging
 import typing
 from typing import Literal
 from fastmcp.exceptions import ToolError
 from pydantic import ValidationError
 from app import get_ctx, mcp
 from schema import TrackedApplication, StatusType
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp.tools.tracker")
+logger = setup_logger(Settings.LOG_DIR / "tracker_tool.log", name="linkedin-mcp.tools.tracker")
 
 
 @mcp.tool()

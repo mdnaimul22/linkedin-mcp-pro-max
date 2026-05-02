@@ -1,11 +1,11 @@
 import asyncio
-import logging
 from typing import Any, Literal
 from patchright.async_api import Page
 from browser.helpers.executor import ApiExecutor
 from browser.helpers import stabilize_navigation, wait_for_any_selector
+from config import Settings, setup_logger
 
-logger = logging.getLogger("browser.actors.profile_editor")
+logger = setup_logger(Settings.LOG_DIR / "profile_editor.log", name="browser.actors.profile_editor")
 
 
 class ProfileEditor:
@@ -109,8 +109,6 @@ class ProfileEditor:
             await stabilize_navigation(self.page)
             await self._force_notify_network_off()
 
-            # SELF-HEALING: Use ApiExecutor to discover fields dynamically
-            from browser.helpers.executor import ApiExecutor
             executor = ApiExecutor(self.page)
             # Ensure at least one input/textarea is visible before discovery
             await wait_for_any_selector(self.page, ["input", "textarea"], timeout=10000)
@@ -140,7 +138,7 @@ class ProfileEditor:
                 
                 if field and field.id:
                     selector = f"#{field.id}"
-                    logger.debug("Discovery: matched '%s' to selector %s", label_key, selector)
+                    logger.debug(f"Discovery: matched '{label_key}' to selector {selector}")
                     await self.page.locator(selector).first.fill(value)
                     if label_key in ["company", "location"]:
                         await asyncio.sleep(1.5)
@@ -174,15 +172,12 @@ class ProfileEditor:
 
             if start_date_month:
                 field = find_field("start date", discovery.selects) # Usually "Month" is inside a fieldset or labeled
-                # Start date month select often has ID like ...-start-date
                 if field and field.id:
                     await self.page.locator(f"#{field.id}").select_option(label=start_date_month)
                 else:
                     await self.page.locator('select[id$="-dateRange-start-date"]').select_option(label=start_date_month)
             
             if start_date_year:
-                field = find_field("start date", discovery.selects) # This might be tricky if labels are similar
-                # Year select usually has "year" in ID or label
                 year_field = None
                 for f in discovery.selects:
                     if f.label and "year" in f.label.lower() and "start" in f.label.lower():
@@ -202,10 +197,8 @@ class ProfileEditor:
 
             needs_toggle = False
             if is_current and not is_end_date_disabled:
-
                 needs_toggle = True
             elif not is_current and is_end_date_disabled:
-
                 needs_toggle = True
 
             if needs_toggle:
@@ -264,7 +257,6 @@ class ProfileEditor:
             await self.page.goto(url, wait_until="load", timeout=60000)
 
             executor = ApiExecutor(self.page)
-
             await wait_for_any_selector(self.page, ["input", "textarea"], timeout=10000)
             discovery = await executor.discover()
 
@@ -289,7 +281,7 @@ class ProfileEditor:
                 field = find_field(label_key, discovery.inputs + discovery.textareas)
                 if field and field.id:
                     selector = f"#{field.id}"
-                    logger.debug("Discovery: matched '%s' to selector %s", label_key, selector)
+                    logger.debug(f"Discovery: matched '{label_key}' to selector {selector}")
                     await self.page.locator(selector).first.fill(value)
                     if label_key in ["school", "degree", "fieldOfStudy"]:
                         await asyncio.sleep(1.5)
@@ -300,7 +292,6 @@ class ProfileEditor:
                     if label_key == "fieldOfStudy":
                         selector = 'input[id$="-fieldOfStudy"]'
                     
-                    logger.debug("Fallback: using suffix selector for '%s'", label_key)
                     try:
                         await self.page.locator(selector).first.fill(value)
                         if label_key in ["school", "degree", "fieldOfStudy"]:
@@ -308,7 +299,7 @@ class ProfileEditor:
                             await self.page.keyboard.press("ArrowDown")
                             await self.page.keyboard.press("Enter")
                     except Exception as e:
-                        logger.warning("Failed to fill field '%s': %s", label_key, e)
+                        logger.warning(f"Failed to fill field '{label_key}': {e}")
 
             if start_year:
                 field = find_field("start date", discovery.selects)
@@ -360,7 +351,6 @@ class ProfileEditor:
             for i in range(count):
                 item = education_items.nth(i)
                 text = await item.inner_text()
-                # Use robust matching
                 if school.lower().strip() in text.lower() and degree.lower().strip() in text.lower():
                     target_item = item
                     break
@@ -371,7 +361,6 @@ class ProfileEditor:
                     "message": f"Education at '{school}' with degree '{degree}' not found.",
                 }
 
-            # Click the edit button within this item
             edit_button = target_item.locator("a[href*='/edit/forms/education/']").first
             if not await edit_button.is_visible():
                 return {
@@ -382,7 +371,6 @@ class ProfileEditor:
             await edit_button.click()
             await stabilize_navigation(self.page)
 
-            # Now we are in the edit modal. Click "Delete education"
             delete_btn = self.page.locator(
                 'button.artdeco-button--secondary:has-text("Delete education"), button:has-text("Delete education")'
             ).first
@@ -395,7 +383,6 @@ class ProfileEditor:
             await delete_btn.click()
             await asyncio.sleep(1)
 
-            # Confirm deletion modal
             confirm_btn = self.page.locator(
                 'button.artdeco-button--primary:has-text("Delete")'
             ).first
@@ -418,7 +405,6 @@ class ProfileEditor:
             await self.page.goto(url, wait_until="load", timeout=60000)
             await stabilize_navigation(self.page)
 
-            # Look for edit background button
             edit_btn_selector = 'button[aria-label*="Edit background"], .profile-background-image__edit-btn, button:has(.profile-background-image__edit-icon)'
             edit_btn = self.page.locator(edit_btn_selector).first
             
@@ -442,7 +428,7 @@ class ProfileEditor:
             if await file_input.count() == 0:
                  return {"status": "error", "message": "File upload input not found after clicking edit button."}
 
-            logger.info("Uploading image: %s", image_path)
+            logger.info(f"Uploading image: {image_path}")
             await file_input.set_input_files(image_path)
             
             apply_btn_selector = 'button.artdeco-button--primary:has-text("Apply"), button:has-text("Apply"), button:has-text("Save")'
@@ -458,7 +444,7 @@ class ProfileEditor:
                 return {"status": "error", "message": "Apply/Save button not found after upload."}
 
         except Exception as e:
-            logger.error("Failed to update cover image: %s", e)
+            logger.error(f"Failed to update cover image: {e}")
             return {"status": "error", "message": str(e)}
 
     async def remove_experience(
@@ -474,7 +460,6 @@ class ProfileEditor:
             await self.page.goto(url, wait_until="load", timeout=60000)
             await stabilize_navigation(self.page)
 
-            # Find the experience card containing the company and title
             experience_items = self.page.locator("li.pvs-list__paged-list-item")
             count = await experience_items.count()
 
@@ -482,7 +467,6 @@ class ProfileEditor:
             for i in range(count):
                 item = experience_items.nth(i)
                 text = await item.inner_text()
-                # Use robust matching avoiding case issues
                 if company.lower().strip() in text.lower() and title.lower().strip() in text.lower():
                     target_item = item
                     break
@@ -493,7 +477,6 @@ class ProfileEditor:
                     "message": f"Experience with title '{title}' at '{company}' not found.",
                 }
 
-            # Click the edit button (pencil icon) within this item
             edit_button = target_item.locator("a[href*='/edit/forms/position/'], a[href*='/add-edit/POSITION/']").first
             if not await edit_button.is_visible():
                 return {
@@ -504,7 +487,6 @@ class ProfileEditor:
             await edit_button.click()
             await stabilize_navigation(self.page)
 
-            # Now we are in the edit modal. Click "Delete experience"
             delete_btn = self.page.locator(
                 'button.artdeco-button--secondary:has-text("Delete experience"), button:has-text("Delete experience")'
             ).first
@@ -517,7 +499,6 @@ class ProfileEditor:
             await delete_btn.click()
             await asyncio.sleep(1)
 
-            # Confirm deletion modal
             confirm_btn = self.page.locator(
                 'button.artdeco-button--primary:has-text("Delete")'
             ).first
@@ -532,8 +513,6 @@ class ProfileEditor:
 
         except Exception as e:
             return {"status": "error", "message": str(e)}
-
-
 
     async def manage_skills(
         self, profile_id: str, skill_name: str, action: Literal["add", "delete"] = "add"

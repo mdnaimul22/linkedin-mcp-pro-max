@@ -1,11 +1,10 @@
 import json
-import logging
 from typing import Optional
-
 from fastmcp.exceptions import ToolError
 from app import get_ctx, mcp
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp.tools.content")
+logger = setup_logger(Settings.LOG_DIR / "content_tool.log", name="linkedin-mcp.tools.content")
 
 
 @mcp.tool()

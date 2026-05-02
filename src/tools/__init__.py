@@ -4,16 +4,16 @@ Modules are discovered and imported dynamically at runtime.
 
 import pkgutil
 import importlib
-import logging
-from pathlib import Path
+import os
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp-pro-max.tools")
+logger = setup_logger(Settings.LOG_DIR / "tools.log", name="linkedin-mcp-pro-max.tools")
 
 
 def discover_tools():
     """Autodiscover and import all tool modules in this package."""
     # The absolute path to this tools directory
-    package_path = [str(Path(__file__).parent)]
+    package_path = [os.path.dirname(__file__)]
 
     for _, module_name, is_pkg in pkgutil.walk_packages(package_path):
         # Skip init and non-functional helpers, and subpackages
@@ -30,4 +30,3 @@ def discover_tools():
 
 # Trigger discovery on package import
 discover_tools()
-

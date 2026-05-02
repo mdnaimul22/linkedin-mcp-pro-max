@@ -7,14 +7,13 @@ and dynamic service wiring.
 """
 
 from __future__ import annotations
-import logging
 import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, AsyncIterator, Optional
 
 from fastmcp import FastMCP
 
-from config.settings import Settings, get_settings
+from config import Settings, setup_logger
 from browser.manager import Manager, create_browser
 from browser.session import Session
 from browser.helpers.executor import ApiExecutor
@@ -33,12 +32,13 @@ if TYPE_CHECKING:
     
     # Type hints for dynamic services (wired at runtime)
     from services.profile import ProfileService
-    from services.job import JobSearchService
+    from services.jobs import JobSearchService
     from services.tracker import JobTrackerService
-    from services.resume import ResumeGenerator, CoverLetterGenerator
-    from services.analyzer import ProfileAnalyzerService
+    from services.resume import ResumeGenerator
+    from services.cover_letter import CoverLetterGeneratorService
+    from services.profile_analyzer import ProfileAnalyzerService
 
-logger = logging.getLogger("linkedin-mcp.app")
+logger = setup_logger(Settings.LOG_DIR / "app.log", name="linkedin-mcp.app")
 
 @dataclass
 class AppContext:
@@ -65,12 +65,12 @@ class AppContext:
     jobs: JobSearchService = field(init=False)
     tracker: JobTrackerService = field(init=False)
     resume_gen: ResumeGenerator = field(init=False)
-    cover_letter_gen: CoverLetterGenerator = field(init=False)
+    cover_letter_gen: CoverLetterGeneratorService = field(init=False)
     profile_analyzer: ProfileAnalyzerService = field(init=False)
 
     def __post_init__(self) -> None:
         self.lock = asyncio.Lock()
-        self.cache = JSONCache(self.settings.data_dir / "cache")
+        self.cache = JSONCache(self.settings.DATA_DIR / "cache")
         
         # Initialize providers via factory
         self.ai = create_ai_provider(self.settings)
@@ -94,7 +94,7 @@ class AppContext:
                         kwargs = {dep: getattr(self, dep, None) for dep in meta.deps}
                         instance = meta.cls(**kwargs)
                     setattr(self, meta.attr, instance)
-                    logger.debug("Wired service: %s \u2192 %s (pass %d)", meta.attr, meta.cls.__name__, pass_num)
+                    logger.debug(f"Wired service: {meta.attr} -> {meta.cls.__name__} (pass {pass_num})")
                 except Exception as exc:
                     still_pending.append((meta, exc))
 
@@ -129,7 +129,7 @@ class AppContext:
 
         self.api_executor = ApiExecutor(
             page=self.browser.page,
-            registry_path=self.settings.data_dir / "api_cookbook.json",
+            registry_path=self.settings.DATA_DIR / "api_cookbook.json",
         )
         self.browser.set_api_executor(self.api_executor)
         logger.info("Browser initialized - all services wired.")
@@ -142,7 +142,7 @@ async def get_ctx() -> AppContext:
     """Retrieve or lazily initialize the global AppContext singleton."""
     global _context
     if not _context:
-        settings = get_settings()
+        settings = Settings
         sessions = Session(settings)
         client = LinkedInClient(settings)
         _context = AppContext(settings, sessions, client)
@@ -164,7 +164,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[None]:
         await ctx.initialize_browser()
         logger.info("MCP server lifespan started.")
     except Exception as exc:
-        logger.warning("Lifespan init failed: %s", exc)
+        logger.warning(f"Lifespan init failed: {exc}")
 
     yield
 
@@ -180,19 +180,24 @@ async def run_session_commands(settings: Settings) -> bool:
     await ctx.initialize_browser()
     auth = AuthResolver(ctx.browser, ctx.sessions)
 
-    if settings.logout:
+    # Note: CLI settings might differ from Settings singleton if passed via click/argparse
+    # but here we assume the passed 'settings' is what we should check for flags
+    if getattr(settings, 'logout', False):
         success = await auth.logout()
-        print("Logged out successfully." if success else "Logout failed.")
+        import sys
+        sys.stderr.write("Logged out successfully.\n" if success else "Logout failed.\n")
         return True
 
-    if settings.status:
+    if getattr(settings, 'status', False):
         is_auth = await auth.is_authenticated()
-        print(f"Authenticated: {is_auth}")
+        import sys
+        sys.stderr.write(f"Authenticated: {is_auth}\n")
         return True
 
-    if settings.login:
+    if getattr(settings, 'login', False):
         success = await auth.login()
-        print("Login successful." if success else "Login failed.")
+        import sys
+        sys.stderr.write("Login successful.\n" if success else "Login failed.\n")
         return True
 
     return False

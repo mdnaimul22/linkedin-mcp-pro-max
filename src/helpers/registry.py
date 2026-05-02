@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import importlib
-import logging
 import pkgutil
 from dataclasses import dataclass, field
 from typing import Callable, Type
+from config import Settings, setup_logger
 
-logger = logging.getLogger("linkedin-mcp-pro-max.registry")
+logger = setup_logger(Settings.LOG_DIR / "registry.log", name="linkedin-mcp-pro-max.registry")
 
 
 @dataclass

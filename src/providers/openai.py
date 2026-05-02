@@ -1,16 +1,16 @@
 import asyncio
 import json
-import logging
 import time
 import uuid
+import os
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from providers.base import BaseProvider
 from helpers.exceptions import AIProviderError
+from config import Settings, setup_logger, ensure_dir
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(Settings.LOG_DIR / "openai_provider.log", name="linkedin-mcp.openai")
 
 
 def _iso_now() -> str:
@@ -29,11 +29,12 @@ def _build_display_prompt(messages: List[Dict[str, str]]) -> str:
     return "\n".join(chunks).rstrip() + "\n"
 
 
-def _atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _atomic_write_json(path: Any, payload: Dict[str, Any]) -> None:
+    ensure_dir(str(path.parent))
     tmp = path.parent / f".{path.name}.tmp"
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, str(path))
 
 
 class OpenAIProvider(BaseProvider):
@@ -55,7 +56,7 @@ class OpenAIProvider(BaseProvider):
         random_seed: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
         manual_mode: bool = False,
-        manual_queue_dir: Optional[Union[str, Path]] = None,
+        manual_queue_dir: Optional[Any] = None,
     ):
         self.api_key = api_key
         self.model = model
@@ -77,8 +78,9 @@ class OpenAIProvider(BaseProvider):
                 raise ValueError(
                     "manual_queue_dir is required when manual_mode is True."
                 )
-            self.manual_queue_dir = Path(str(manual_queue_dir)).expanduser().resolve()
-            self.manual_queue_dir.mkdir(parents=True, exist_ok=True)
+            # manual_queue_dir expected to be a Path-like object from config or passed in
+            self.manual_queue_dir = manual_queue_dir
+            ensure_dir(str(self.manual_queue_dir))
             self.client = None
         else:
             try:
@@ -108,8 +110,6 @@ class OpenAIProvider(BaseProvider):
             {"role": "user", "content": user_prompt},
         ]
 
-        # Define OpenAI reasoning models that require max_completion_tokens
-        # These models don't support temperature/top_p and use different parameters
         OPENAI_REASONING_MODEL_PREFIXES = (
             "o1-",
             "o1",
@@ -143,7 +143,6 @@ class OpenAIProvider(BaseProvider):
             params["top_p"] = kwargs.get("top_p", self.top_p)
             params["max_tokens"] = kwargs.get("max_tokens", self.max_tokens)
 
-            # Use native JSON mode if requested via kwargs and not reasoning model
             if kwargs.get("response_format") == "json_object":
                 params["response_format"] = {"type": "json_object"}
 
@@ -211,7 +210,7 @@ class OpenAIProvider(BaseProvider):
 
         response = await loop.run_in_executor(None, _sync_call)
         logger.debug(f"API parameters: {params}")
-        logger.debug(f"API response: {response.choices[0].message.content}")
+        # logger.debug(f"API response: {response.choices[0].message.content}")
         return str(response.choices[0].message.content)
 
     async def _manual_wait_for_answer(
@@ -255,7 +254,8 @@ class OpenAIProvider(BaseProvider):
         while True:
             if answer_path.exists():
                 try:
-                    data = json.loads(answer_path.read_text(encoding="utf-8"))
+                    with open(answer_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
                 except Exception as e:
                     logger.warning(
                         f"[manual_mode] Failed to parse answer JSON for {task_id}: {e}"

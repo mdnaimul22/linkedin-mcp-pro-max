@@ -8,11 +8,11 @@ session, providers, services, or tools.
 import os
 import re
 import tempfile
-import logging
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import Any
+from config import Settings, setup_logger, ensure_dir, exists, delete
 
-logger = logging.getLogger("linkedin-mcp.helpers")
+logger = setup_logger(Settings.LOG_DIR / "helpers.log", name="linkedin-mcp.helpers")
 
 
 def sanitize_filename(value: str, max_length: int = 200) -> str:
@@ -30,26 +30,34 @@ def utcnow_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def secure_mkdir(path: Path, mode: int = 0o700) -> None:
+def secure_mkdir(path: Any, mode: int = 0o700) -> None:
     """Create a directory tree with restrictive (owner-only) permissions."""
-    path.mkdir(parents=True, exist_ok=True, mode=mode)
+    # Note: ensure_dir doesn't take mode, so we use it to ensure it exists
+    # but might need to set mode manually if strict requirement
+    ensure_dir(str(path))
+    try:
+        os.chmod(str(path), mode)
+    except Exception:
+        pass
 
 
-def secure_write_text(path: Path, content: str, mode: int = 0o600) -> None:
+def secure_write_text(path: Any, content: str, mode: int = 0o600) -> None:
     """Atomically write *content* to *path* with owner-only file permissions.
 
     Uses a temp file + os.replace() to avoid partial writes.
     """
-    secure_mkdir(path.parent)
-    fd_int, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    parent = str(path.parent)
+    ensure_dir(parent)
+    
+    fd_int, tmp = tempfile.mkstemp(dir=parent, suffix=".tmp")
     try:
         with os.fdopen(fd_int, "w") as f:
             f.write(content)
         os.chmod(tmp, mode)
-        os.replace(tmp, path)
+        os.replace(tmp, str(path))
     except Exception:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        if exists(tmp):
+            delete(tmp)
         raise
 
 

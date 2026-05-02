@@ -1,224 +1,115 @@
-import logging
 from pathlib import Path
-from typing import Literal
-
-from pydantic import Field, SecretStr, field_validator, model_validator
+from typing import Optional, Literal
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-logger = logging.getLogger("linkedin-mcp.config")
-
-# Default directories
-DEFAULT_ROOT = Path(__file__).resolve().parent.parent.parent / ".browser"
-DEFAULT_USER_DATA_DIR = DEFAULT_ROOT / "profile"
-DEFAULT_DATA_DIR = DEFAULT_ROOT / "data"
-
+from .paths import PROJECT_ROOT
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables and .env file."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
+    PROJECT_NAME: str = "LinkedIn-MCP-Pro-Max"
+    VERSION: str = "1.0.0"
+    ENV: str = Field(default="development", validation_alias="APP_ENV")
 
     # LinkedIn credentials
     linkedin_email: str = Field(default="", validation_alias="LINKEDIN_EMAIL")
-    linkedin_password: SecretStr = Field(
-        default=SecretStr(""), validation_alias="LINKEDIN_PASSWORD"
-    )
+    linkedin_password: SecretStr = Field(default=SecretStr(""), validation_alias="LINKEDIN_PASSWORD")
     linkedin_username: str = Field(default="", validation_alias="LINKEDIN_USERNAME")
 
     # AI Provider settings
-    anthropic_api_key: SecretStr = Field(
-        default=SecretStr(""), validation_alias="ANTHROPIC_API_KEY"
-    )
-    openai_api_key: SecretStr = Field(
-        default=SecretStr(""), validation_alias="OPENAI_API_KEY"
-    )
-    ai_provider: Literal["claude", "openai", "ensemble"] = Field(
-        default="claude", validation_alias="AI_PROVIDER"
-    )
+    ai_provider: Literal["claude", "openai", "ensemble"] = Field(default="claude", validation_alias="AI_PROVIDER")
     ai_base_url: str = Field(default="", validation_alias="AI_BASE_URL")
-    ai_model: str = Field(
-        default="claude-3-5-sonnet-20241022", validation_alias="AI_MODEL"
-    )
+    ai_model: str = Field(default="claude-3-5-sonnet-20241022", validation_alias="AI_MODEL")
+    anthropic_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="ANTHROPIC_API_KEY")
+    openai_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENAI_API_KEY")
 
     # Browser settings
     headless: bool = Field(default=True, validation_alias="HEADLESS")
-    user_data_dir: Path = Field(
-        default=DEFAULT_USER_DATA_DIR, validation_alias="USER_DATA_DIR"
-    )
     slow_mo: int = Field(default=0, validation_alias="SLOW_MO")
     timeout: int = Field(default=30000, validation_alias="TIMEOUT")
     viewport_width: int = Field(default=1280, validation_alias="VIEWPORT_WIDTH")
     viewport_height: int = Field(default=720, validation_alias="VIEWPORT_HEIGHT")
-    user_agent: str | None = Field(default=None, validation_alias="USER_AGENT")
-    chrome_path: str | None = Field(default=None, validation_alias="CHROME_PATH")
-    cdp_url: str | None = Field(default=None, validation_alias="CDP_URL")
-    experimental_persist_derived_session: bool = Field(
-        default=True, validation_alias="LINKEDIN_EXPERIMENTAL_PERSIST_DERIVED_SESSION"
-    )
+    user_agent: Optional[str] = Field(default=None, validation_alias="USER_AGENT")
+    chrome_path: Optional[str] = Field(default=None, validation_alias="CHROME_PATH")
+    cdp_url: Optional[str] = Field(default=None, validation_alias="CDP_URL")
+    experimental_persist_derived_session: bool = Field(default=True, validation_alias="LINKEDIN_EXPERIMENTAL_PERSIST_DERIVED_SESSION")
 
     # Server settings
-    transport: Literal["stdio", "streamable-http"] = Field(
-        default="stdio", validation_alias="TRANSPORT"
-    )
+    transport: Literal["stdio", "streamable-http"] = Field(default="stdio", validation_alias="TRANSPORT")
     host: str = Field(default="127.0.0.1", validation_alias="HOST")
     port: int = Field(default=8000, validation_alias="PORT")
-    path: str = Field(default="/mcp", validation_alias="HTTP_PATH")
+    http_path: str = Field(default="/mcp", validation_alias="HTTP_PATH")
 
-    # Application settings
-    data_dir: Path = Field(default=DEFAULT_DATA_DIR, validation_alias="DATA_DIR")
+    # App Settings & Paths (Use names without leading underscores for Pydantic compatibility)
+    raw_log_dir: str = Field(default="logs", validation_alias="LOG_DIR")
+    raw_data_dir: str = Field(default=".browser/data", validation_alias="DATA_DIR")
+    raw_user_data_dir: str = Field(default=".browser/profile", validation_alias="USER_DATA_DIR")
+    raw_templates_dir: str = Field(default="src/templates", validation_alias="TEMPLATES_DIR")
+    
     cache_ttl_hours: int = Field(default=24, validation_alias="CACHE_TTL_HOURS")
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
-        default="INFO", validation_alias="LOG_LEVEL"
-    )
-    trace_mode: Literal["off", "on_error", "always"] = Field(
-        default="on_error", validation_alias="LINKEDIN_TRACE_MODE"
-    )
-    debug_trace_dir: Path | None = Field(
-        default=None, validation_alias="LINKEDIN_DEBUG_TRACE_DIR"
-    )
-    is_interactive: bool = Field(default=False)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO", validation_alias="LOG_LEVEL")
+    trace_mode: Literal["off", "on_error", "always"] = Field(default="on_error", validation_alias="LINKEDIN_TRACE_MODE")
+    
+    # Image generation settings
+    gemini_api_key: str = Field(default="", validation_alias="GEMINI_API_KEY")
+    gemini_image_model: str = Field(default="gemini-2.5-flash-image", validation_alias="GEMINI_IMAGE_MODEL")
 
     # API Limits
-    linkedin_rate_limit_cpm: int = Field(
-        default=30, validation_alias="LINKEDIN_RATE_LIMIT_CPM"
-    )
-    linkedin_max_search_results: int = Field(
-        default=20, validation_alias="LINKEDIN_MAX_SEARCH_RESULTS"
-    )
-
+    linkedin_rate_limit_cpm: int = Field(default=30, validation_alias="LINKEDIN_RATE_LIMIT_CPM")
+    linkedin_max_search_results: int = Field(default=20, validation_alias="LINKEDIN_MAX_SEARCH_RESULTS")
     debug: bool = Field(default=False, validation_alias="DEBUG")
+    raw_debug_trace_dir: Optional[str] = Field(default=None, validation_alias="DEBUG_TRACE_DIR")
 
-    # Image generation settings (Google Gemini — configured via .env)
-    gemini_api_key: str = Field(
-        default="",
-        validation_alias="GEMINI_API_KEY",
-    )
-    gemini_image_model: str = Field(
-        default="gemini-2.5-flash-image",
-        validation_alias="GEMINI_IMAGE_MODEL",
-    )
-
-    # Session constants
-    source_profile_dir_name: str = "profile"
-    source_state_file_name: str = "source-state.json"
-    runtime_profiles_dir_name: str = "runtimes"
-    runtime_state_file_name: str = "runtime-state.json"
-    cookies_file_name: str = "cookies.json"
-
-    # Session command flags (CLI-driven,    # Action flags (usually CLI-only, not in .env)
+    # Dynamic CLI Overrides (Non-pydantic fields)
     login: bool = False
     status: bool = False
     logout: bool = False
 
-    @field_validator("user_data_dir", "data_dir", mode="before")
-    @classmethod
-    def expand_paths(cls, v: str | Path) -> Path:
-        """Expand ~ in paths."""
-        if isinstance(v, str):
-            return Path(v).expanduser()
-        return v.expanduser()
+    def resolve_path(self, val: str) -> Path:
+        p = Path(val).expanduser()
+        return p if p.is_absolute() else PROJECT_ROOT / p
 
-    @model_validator(mode="after")
-    def validate_ai_config(self) -> "Settings":
-        """Validate AI provider configuration."""
-        if self.ai_provider == "claude" and not self.anthropic_api_key:
-            logger.warning("Anthropic API Key is missing for Claude provider")
-        elif self.ai_provider == "openai" and not self.openai_api_key:
-            logger.warning("OpenAI API Key is missing for OpenAI provider")
-        elif self.ai_provider == "ensemble":
-            if not self.anthropic_api_key or not self.openai_api_key:
-                logger.warning(
-                    "Both Anthropic and OpenAI keys are required for Ensemble provider"
-                )
-        return self
-
+    @property
+    def LOG_DIR(self) -> Path: return self.resolve_path(self.raw_log_dir)
+    @property
+    def DATA_DIR(self) -> Path: return self.resolve_path(self.raw_data_dir)
+    @property
+    def USER_DATA_DIR(self) -> Path: return self.resolve_path(self.raw_user_data_dir)
+    @property
+    def TEMPLATES_DIR(self) -> Path: return self.resolve_path(self.raw_templates_dir)
+    @property
+    def AUTH_ROOT(self) -> Path: return self.USER_DATA_DIR.parent
+    @property
+    def debug_trace_dir(self) -> Optional[Path]: return self.resolve_path(self.raw_debug_trace_dir) if self.raw_debug_trace_dir else None
+    @property
+    def is_production(self) -> bool: return self.ENV.lower() == "production"
+    @property
+    def has_image_gen(self) -> bool: return bool(self.gemini_api_key)
+    
     def validate_config(self) -> list[str]:
-        """Legacy validation for backward compatibility with cli.py."""
-        errors = []
-        if not self.linkedin_email:
-            errors.append("LINKEDIN_EMAIL is required")
-        if not self.linkedin_password.get_secret_value():
-            errors.append("LINKEDIN_PASSWORD is required")
-
-        # Pydantic already handles some, but we return list for cli.py compatibility
+        """Validate essential configuration and return advisories."""
+        advisories = []
+        if not self.linkedin_email and not self.linkedin_username:
+            advisories.append("Missing LinkedIn credentials")
         if self.ai_provider == "claude" and not self.anthropic_api_key:
-            errors.append("ANTHROPIC_API_KEY is required for Claude provider")
+            advisories.append("Missing Anthropic API Key")
         if self.ai_provider == "openai" and not self.openai_api_key:
-            errors.append("OPENAI_API_KEY is required for OpenAI provider")
+            advisories.append("Missing OpenAI API Key")
+        return advisories
 
-        return errors
+    model_config = SettingsConfigDict(
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
-    @property
-    def auth_root(self) -> Path:
-        """Return the root directory for all authentication artifacts."""
-        return self.user_data_dir.parent
-
-    @property
-    def cookies_path(self) -> Path:
-        """Return the path for portable bridge cookies."""
-        return self.auth_root / self.cookies_file_name
-
-    @property
-    def source_state_path(self) -> Path:
-        """Return the metadata path for the primary authenticated profile."""
-        return self.auth_root / self.source_state_file_name
-
-    @property
-    def runtime_profiles_root(self) -> Path:
-        """Return the root directory for all derived runtime profiles."""
-        return self.auth_root / self.runtime_profiles_dir_name
-
-    @property
-    def has_ai(self) -> bool:
-        """Whether AI generation is available based on provider."""
-        if self.ai_provider == "claude":
-            return bool(self.anthropic_api_key.get_secret_value())
-        if self.ai_provider == "openai":
-            return bool(self.openai_api_key.get_secret_value())
-        if self.ai_provider == "ensemble":
-            return bool(
-                self.anthropic_api_key.get_secret_value()
-                and self.openai_api_key.get_secret_value()
-            )
-        return False
-
-    @property
-    def has_image_gen(self) -> bool:
-        """Whether image generation is available (Gemini API key configured)."""
-        return bool(self.gemini_api_key)
-
-    def ensure_dirs(self) -> None:
-        """Create required directories if they don't exist."""
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.user_data_dir.mkdir(parents=True, exist_ok=True)
-        self.runtime_profiles_root.mkdir(parents=True, exist_ok=True)
-
-
-# Singleton pattern for settings
-_settings: Settings | None = None
-
+# Singleton instance
+Settings = Settings()
 
 def get_settings() -> Settings:
-    """Return the cached settings instance, creating one on first call."""
-    global _settings
-    if _settings is not None:
-        return _settings
+    """Compatibility helper to return the global settings singleton."""
+    return Settings
 
-    from helpers import is_interactive_environment
-
-    settings = Settings()
-    settings.is_interactive = is_interactive_environment()
-    settings.ensure_dirs()
-    _settings = settings
-    return _settings
-
-
-def set_settings(settings: Settings) -> None:
-    """Update the global settings instance."""
-    global _settings
-    _settings = settings
+def set_settings(new_settings: Settings) -> None:
+    """Update the global settings singleton with values from a new instance."""
+    global Settings
+    Settings = new_settings

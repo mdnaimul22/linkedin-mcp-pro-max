@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from typing import Any, Optional, TYPE_CHECKING
-from pathlib import Path
 
-from config.settings import Settings
+from config import Settings, setup_logger
 from helpers.exceptions import (
     AuthenticationError,
     LinkedInAPIError,
@@ -29,7 +27,7 @@ from providers.helpers import AsyncRateLimiter
 if TYPE_CHECKING:
     from browser.helpers.sniffer import NetworkSniffer
 
-logger = logging.getLogger("linkedin-mcp.api")
+logger = setup_logger(Settings.LOG_DIR / "linkedin_api.log", name="linkedin-mcp.api")
 
 JOB_TYPE_MAP: dict[str, str] = {
     "FULL_TIME": "F",
@@ -57,13 +55,13 @@ DATE_POSTED_MAP: dict[str, int] = {
 }
 
 
-def _cookies_path(settings: Settings) -> Path:
-    return settings.user_data_dir.parent / "cookies.json"
+def _cookies_path(settings: Any) -> Any:
+    return settings.USER_DATA_DIR.parent / "cookies.json"
 
 
 class LinkedInClient:
     def __init__(
-        self, settings: Settings, sniffer: Optional[NetworkSniffer] = None
+        self, settings: Any, sniffer: Optional[NetworkSniffer] = None
     ) -> None:
         self._settings = settings
         self.sniffer = sniffer
@@ -93,7 +91,7 @@ class LinkedInClient:
                 )
             return jar
         except Exception as exc:
-            logger.warning("Failed to load cookies from %s: %s", path, exc)
+            logger.warning(f"Failed to load cookies from {path}: {exc}")
             return None
 
     async def ensure_authenticated(self) -> None:
@@ -152,7 +150,7 @@ class LinkedInClient:
                         msg += " Browser session found, but API is still challenged. Try refreshing the browser login."
                     raise AuthenticationError(msg) from exc
 
-                logger.debug("Authentication error details: %s", exc)
+                logger.debug(f"Authentication error details: {exc}")
                 raise AuthenticationError(
                     f"LinkedIn login failed: {exc}. Try running 'uv run main.py --login' if this persists."
                 ) from exc
@@ -198,7 +196,7 @@ class LinkedInClient:
                     body=res_body,
                 )
             except Exception as exc:
-                logger.debug("Failed to log API call to sniffer: %s", exc)
+                logger.debug(f"Failed to log API call to sniffer: {exc}")
             return response
 
         session.hooks["response"].append(response_hook)
@@ -282,24 +280,6 @@ class LinkedInClient:
         await self.ensure_authenticated()
         await self._rate_limiter.acquire()
 
-        def _get_profile() -> dict[str, Any]:
-            return self._api.get_profile(profile_id)
-
-        def _get_skills() -> list[dict[str, Any]]:
-            try:
-                return self._api.get_profile_skills(profile_id)
-            except Exception as exc:
-                logger.warning("Failed to fetch skills for %s: %s", profile_id, exc)
-                return []
-
-        def _get_contact() -> dict[str, Any]:
-            try:
-                return self._api.get_profile_contact_info(profile_id)
-            except Exception as exc:
-                logger.warning(
-                    "Failed to fetch contact info for %s: %s", profile_id, exc
-                )
-                return {}
 
 
         def _fetch_all() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
@@ -309,11 +289,11 @@ class LinkedInClient:
             try:
                 s = self._api.get_profile_skills(profile_id)
             except Exception as exc:
-                logger.warning("Failed to fetch skills for %s: %s", profile_id, exc)
+                logger.warning(f"Failed to fetch skills for {profile_id}: {exc}")
             try:
                 c = self._api.get_profile_contact_info(profile_id)
             except Exception as exc:
-                logger.warning("Failed to fetch contact info for %s: %s", profile_id, exc)
+                logger.warning(f"Failed to fetch contact info for {profile_id}: {exc}")
             return p, s, c
 
         try:

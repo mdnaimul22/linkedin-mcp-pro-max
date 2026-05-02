@@ -1,10 +1,10 @@
-import logging
 from typing import Any
 from patchright.async_api import Page, Locator
 
 from browser.helpers import stabilize_navigation, scroll_to_bottom
+from config import Settings, setup_logger
 
-logger = logging.getLogger("browser.scrapers.profile")
+logger = setup_logger(Settings.LOG_DIR / "profile_scraper.log", name="browser.scrapers.profile")
 
 
 class ProfileScraper:
@@ -18,7 +18,7 @@ class ProfileScraper:
         profile_url = f"https://www.linkedin.com/in/{profile_id}/"
 
 
-        logger.info("Scraping profile via UI: %s", profile_url)
+        logger.info(f"Scraping profile via UI: {profile_url}")
 
         await self.page.goto(profile_url, wait_until="load")
         await stabilize_navigation(self.page)
@@ -26,7 +26,7 @@ class ProfileScraper:
 
         # Check for authwall
         if "linkedin.com/authwall" in self.page.url:
-            logger.error("Caught by authwall at: %s", self.page.url)
+            logger.error(f"Caught by authwall at: {self.page.url}")
             return {
                 "name": "LinkedIn Member",
                 "profile_id": profile_id,
@@ -96,7 +96,7 @@ class ProfileScraper:
                 if target_url:
                     if not target_url.startswith("http"):
                         target_url = f"https://www.linkedin.com{target_url}"
-                    logger.info("Navigating to detailed experience: %s", target_url)
+                    logger.info(f"Navigating to detailed experience: {target_url}")
                     await self.page.goto(target_url, wait_until="load")
                     await stabilize_navigation(self.page)
                     await scroll_to_bottom(self.page, max_scrolls=5)
@@ -117,7 +117,7 @@ class ProfileScraper:
                     if exp:
                         experiences.append(exp)
         except Exception as exc:
-            logger.debug("Experience scraping minor error: %s", exc)
+            logger.debug(f"Experience scraping minor error: {exc}")
         return experiences
 
 
@@ -223,7 +223,7 @@ class ProfileScraper:
                         }
                     )
         except Exception as exc:
-            logger.debug("Education scraping minor error: %s", exc)
+            logger.debug(f"Education scraping minor error: {exc}")
         return educations
 
     async def _scrape_skills(self, profile_id: str) -> list[str]:
@@ -248,7 +248,7 @@ class ProfileScraper:
                 if href:
                     if not href.startswith("http"):
                         href = f"https://www.linkedin.com{href}"
-                    logger.info("Navigating to skills detail: %s", href)
+                    logger.info(f"Navigating to skills detail: {href}")
                     await self.page.goto(href, wait_until="load")
                     await stabilize_navigation(self.page)
                     await scroll_to_bottom(self.page, max_scrolls=5)
@@ -278,7 +278,7 @@ class ProfileScraper:
                     if text and text not in skills:
                         skills.append(text)
         except Exception as exc:
-            logger.debug("Skills scraping minor error: %s", exc)
+            logger.debug(f"Skills scraping minor error: {exc}")
         return skills
 
 

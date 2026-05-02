@@ -1,28 +1,25 @@
 import asyncio
 import json
-import logging
 import time
-from pathlib import Path
 from typing import Any
 
-from config import get_settings
+from config import Settings, setup_logger, ensure_dir, exists, delete
 from helpers import sanitize_filename
 
-logger = logging.getLogger("linkedin-mcp.cache")
+logger = setup_logger(Settings.LOG_DIR / "cache.log", name="linkedin-mcp.cache")
 
 
 class JSONCache:
     """JSON file-based cache with TTL support and L1 in-memory dictionary."""
 
     def __init__(
-        self, cache_dir: Path | None = None, ttl_hours: int | None = None
+        self, cache_dir: Any | None = None, ttl_hours: int | None = None
     ) -> None:
-        settings = get_settings()
-        self._cache_dir = cache_dir or settings.data_dir / "cache"
-        self._ttl_seconds = (ttl_hours or settings.cache_ttl_hours) * 3600
+        self._cache_dir = cache_dir or Settings.DATA_DIR / "cache"
+        self._ttl_seconds = (ttl_hours or Settings.cache_ttl_hours) * 3600
         self._l1: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
 
-    def _get_path(self, namespace: str, key: str) -> Path:
+    def _get_path(self, namespace: str, key: str) -> Any:
         safe_ns = sanitize_filename(namespace)
         safe_key = sanitize_filename(key)
         result = self._cache_dir / safe_ns / f"{safe_key}.json"
@@ -61,11 +58,15 @@ class JSONCache:
                     cached = json.load(f)
                 cached_at = cached.get("_cached_at", 0)
                 if time.time() - cached_at > self._ttl_seconds:
-                    path.unlink(missing_ok=True)
+                    try:
+                        path.unlink(missing_ok=True)
+                    except Exception: pass
                     return None
                 return cached_at, cached.get("data")
             except (json.JSONDecodeError, KeyError):
-                path.unlink(missing_ok=True)
+                try:
+                    path.unlink(missing_ok=True)
+                except Exception: pass
                 return None
 
         result = await asyncio.to_thread(_read)
@@ -88,16 +89,16 @@ class JSONCache:
 
         # 2. Write to L2
         def _write() -> None:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            ensure_dir(str(path.parent))
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(
                     {"_cached_at": now, "data": data}, f, indent=2, default=str
                 )
 
         await asyncio.to_thread(_write)
-        logger.debug("Cached %s/%s", namespace, key)
+        logger.debug(f"Cached {namespace}/{key}")
 
-    async def delete(self, namespace: str, key: str) -> None:
+    async def delete_item(self, namespace: str, key: str) -> None:
         """Remove cached item."""
         l1_key = (namespace, key)
         self._l1.pop(l1_key, None)
@@ -105,7 +106,9 @@ class JSONCache:
         path = self._get_path(namespace, key)
 
         def _unlink() -> None:
-            path.unlink(missing_ok=True)
+            try:
+                path.unlink(missing_ok=True)
+            except Exception: pass
 
         await asyncio.to_thread(_unlink)
 
@@ -121,11 +124,15 @@ class JSONCache:
                 ns_dir = self._cache_dir / sanitize_filename(namespace)
                 if ns_dir.exists():
                     for f in ns_dir.glob("*.json"):
-                        f.unlink(missing_ok=True)
+                        try:
+                            f.unlink(missing_ok=True)
+                        except Exception: pass
             elif self._cache_dir.exists():
                 for ns_dir in self._cache_dir.iterdir():
                     if ns_dir.is_dir():
                         for f in ns_dir.glob("*.json"):
-                            f.unlink(missing_ok=True)
+                            try:
+                                f.unlink(missing_ok=True)
+                            except Exception: pass
 
         await asyncio.to_thread(_clear)

@@ -1,12 +1,12 @@
-import logging
 from app import mcp
+from config import Settings, setup_logger
 from config.prompts import (
     MCP_JOB_SEARCH_WORKFLOW,
     MCP_APPLICATION_WORKFLOW,
     MCP_PROFILE_OPTIMIZATION,
 )
 
-logger = logging.getLogger("linkedin-mcp.tools.prompts")
+logger = setup_logger(Settings.LOG_DIR / "prompts_tool.log", name="linkedin-mcp.tools.prompts")
 
 
 @mcp.prompt()

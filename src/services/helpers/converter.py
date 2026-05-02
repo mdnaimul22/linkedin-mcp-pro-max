@@ -1,11 +1,11 @@
-import logging
 import re
-from pathlib import Path
+from typing import Any
+from config import Settings, setup_logger, ensure_dir
 
-logger = logging.getLogger("linkedin-mcp.converter")
+logger = setup_logger(Settings.LOG_DIR / "converter.log", name="linkedin-mcp.converter")
 
 
-def convert_html_to_pdf(html_content: str, output_path: Path) -> Path:
+def convert_html_to_pdf(html_content: str, output_path: Any) -> Any:
     """Convert HTML to PDF using WeasyPrint (blocking — run in a thread).
 
     Blocks all external URL fetching to prevent SSRF attacks.
@@ -13,7 +13,8 @@ def convert_html_to_pdf(html_content: str, output_path: Path) -> Path:
     try:
         from weasyprint import HTML  # noqa: PLC0415
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure parent directory exists using config helper
+        ensure_dir(str(output_path.parent))
 
         def _deny_url_fetcher(
             url: str, timeout: int = 10, ssl_context: object = None
@@ -37,7 +38,7 @@ def convert_html_to_pdf(html_content: str, output_path: Path) -> Path:
             "WeasyPrint is required for PDF generation. Install with: pip install weasyprint"
         )
     except Exception as exc:
-        logger.exception("PDF generation failed: %s", exc)
+        logger.error(f"PDF generation failed: {exc}")
         raise RuntimeError(f"PDF generation failed: {exc}") from exc
 
 
